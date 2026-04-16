@@ -22,6 +22,18 @@ router.post("/analyze/log", async (req, res) => {
 
 
 
+router.post("/analyze/disk", async (req, res) => {
+  try {
+    const { filePath } = req.body;
+
+    const result = await analyzeDisk(filePath);
+
+    res.json({ data: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 router.post("/analyze/network", async (req, res) => {
   try {

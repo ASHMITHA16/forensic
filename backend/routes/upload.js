@@ -5,7 +5,6 @@ import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
 
 const router = express.Router();
-
 const UPLOAD_DIR = "uploads";
 
 if (!fs.existsSync(UPLOAD_DIR)) {

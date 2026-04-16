@@ -2,181 +2,182 @@ import React, { useState } from "react";
 import axios from "axios";
 
 const Upload = () => {
-    const [file, setFile] = useState(null);
-    const [uploadedPath, setUploadedPath] = useState("");
-    const [analysis, setAnalysis] = useState([]);
-    const[networkAnalysis, setNetworkAnalysis] = useState([]);
-    const styles = {
-     card: {
-     background: "#0a0f1f",
-     border: "1px solid #00f2ff",
-     padding: "10px",
-     borderRadius: "8px",
-     marginBottom: "10px",
-     color: "white"
-   }
-};
-    // 📁 Handle file select
-    const handleFileChange = (e) => {
-        setFile(e.target.files[0]);
-    };
+  const [file, setFile] = useState(null);
+  const [uploadedPath, setUploadedPath] = useState("");
+  const [analysis, setAnalysis] = useState([]);
+  const [networkAnalysis, setNetworkAnalysis] = useState([]);
+  const [diskAnalysis, setDiskAnalysis] = useState([]);
 
-    // 🚀 Upload file
-    const handleUpload = async () => {
-        if (!file) {
-            alert("Please select a file");
-            return;
-        }
+  const styles = {
+    card: {
+      background: "#0a0f1f",
+      border: "1px solid #00f2ff",
+      padding: "10px",
+      borderRadius: "8px",
+      marginBottom: "10px",
+      color: "white",
+    },
+  };
 
-        const formData = new FormData();
-        formData.append("file", file);
+  // 📁 Select file
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
 
-        try {
-            const res = await axios.post(
-                "http://localhost:5000/api/upload",
-                formData
-            );
-
-            console.log("Data" ,res.data.data.path);
-
-            setUploadedPath(res.data.data.path);
-            alert("File uploaded successfully ✅");
-        } catch (err) {
-            console.error(err);
-            alert("Upload failed ❌");
-        }
-    };
-
-    const handleLogAnalysis = async () => {
-    if (!uploadedPath) {
-        alert("Upload file first!");
-        return;
+  // 🚀 Upload file
+  const handleUpload = async () => {
+    if (!file) {
+      alert("Please select a file");
+      return;
     }
-     console.log("Analyzing logs at:", uploadedPath);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
     try {
-        const res = await axios.post(
-            "http://localhost:5000/api/analyze/log",
-            {
-                filePath: uploadedPath
-            }
-            
-        );
-       
-        setAnalysis(res.data.data);
+      const res = await axios.post(
+        "http://localhost:5000/api/upload",
+        formData
+      );
 
+      console.log("Uploaded Path:", res.data.data.path);
+      setUploadedPath(res.data.data.path);
+      alert("File uploaded successfully ✅");
     } catch (err) {
-        console.error(err);
-        console.error("Log analysis error:", err.response ? err.response.data : err);
-        alert("Log analysis failed ❌");
+      console.error(err);
+      alert("Upload failed ❌");
     }
-};
-   
-    const handleNetworkAnalysis = async () => {
+  };
+
+  // 🔍 Log Analysis
+  const handleLogAnalysis = async () => {
     if (!uploadedPath) {
-        alert("Upload file first!");
-        return;
-    }   
-        console.log("Analyzing network data at:", uploadedPath);
-    try {
-        const res = await axios.post(
-            "http://localhost:5000/api/analyze/network",
-            {
-                filePath: uploadedPath
-            }
-        );
-       
-       console.log("Network analysis results:", res.data.data);
-        setNetworkAnalysis(res.data.data);
-       
-    } catch (err) {
-        console.error(err);
-        console.log("Network analysis error:", err.response ? err.response.data : err);
-       
-        alert("Network analysis failed ❌");
+      alert("Upload file first!");
+      return;
     }
-};
 
-//     const handleAnalyze = async () => {
-//         console.log("Analyzing file at:", uploadedPath);
-//     if (!uploadedPath) {
-//         alert("Upload file first!");
-//         return;
-//     }
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/analyze/log",
+        { filePath: uploadedPath }
+      );
 
-//     try {
-//         const res = await axios.post(
-//             "http://localhost:5000/api/analyze/disk",
-//             {
-//                 filePath: uploadedPath
-//             }
-//         );
+      console.log("Log results:", res.data.data);
+      setAnalysis(res.data.data);
+    } catch (err) {
+      console.error(err);
+      alert("Log analysis failed ❌");
+    }
+  };
 
-       
+  // 🌐 Network Analysis
+  const handleNetworkAnalysis = async () => {
+    if (!uploadedPath) {
+      alert("Upload file first!");
+      return;
+    }
 
-//         // 🔥 Set analysis data
-//         setAnalysis(res.data.data);
-//         console.log("Analysis results:", res.data.data);
-//     } catch (err) {
-//         console.error(err);
-//         alert("Analysis failed ❌");
-//     }
-// };
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/analyze/network",
+        { filePath: uploadedPath }
+      );
 
-    // 🔍 Analyze file
-   
-    return (
-        <div style={{ padding: "20px" }}>
-            <h2>🔍 Digital Forensic Upload</h2>
+      console.log("Network results:", res.data.data);
+      setNetworkAnalysis(res.data.data);
+    } catch (err) {
+      console.error(err);
+      alert("Network analysis failed ❌");
+    }
+  };
 
-            <input type="file" onChange={handleFileChange} />
+  // 💾 Disk Analysis
+  const handleDiskAnalysis = async () => {
+    if (!uploadedPath) {
+      alert("Upload file first!");
+      return;
+    }
 
-            <br /><br />
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/analyze/disk",
+        { filePath: uploadedPath }
+      );
 
-            <button onClick={handleUpload}>
-                Upload File
-            </button>
-             {/* <button onClick={handleAnalyze}>
-                Analyze Disk
-            </button> */}
-            <button onClick={handleLogAnalysis}>
-             Analyze Logs
-            </button>
-            <button onClick={handleNetworkAnalysis}>    
-                Analyze Network
-            </button>
+      console.log("Disk results:", res.data.data);
+      setDiskAnalysis(res.data.data);
+    } catch (err) {
+      console.error(err);
+      alert("Disk analysis failed ❌");
+    }
+  };
 
-           <div>
-            <h3>📊 Analysis Results</h3>
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2>🔍 Digital Forensic Upload</h2>
 
-            {analysis.map((item, index) => (
-           <div key={index} style={styles.card}>
-           <p><strong>Type:</strong> {item.type}</p>
-           <p><strong>IP:</strong> {item.ip}</p>
-           <p><strong>Details:</strong> {item.line}</p>
-           </div>
-          ))}
-         </div>
-         <div>
-        <h3>Network Analysis</h3>
+      <input type="file" onChange={handleFileChange} />
 
-           {Array.isArray(networkAnalysis) &&
-             networkAnalysis.map((item, index) => (
-             <div
-             key={index}
-              style={{
+      <br /><br />
+
+      <button onClick={handleUpload}>Upload File</button>
+      <button onClick={handleDiskAnalysis}>Analyze Disk</button>
+      <button onClick={handleLogAnalysis}>Analyze Logs</button>
+      <button onClick={handleNetworkAnalysis}>Analyze Network</button>
+
+      {/* LOG RESULTS */}
+      <div>
+        <h3>📊 Log Analysis</h3>
+        {analysis.length === 0 && <p>No log issues found</p>}
+        {analysis.map((item, index) => (
+          <div key={index} style={styles.card}>
+            <p><strong>Type:</strong> {item.type}</p>
+            <p><strong>IP:</strong> {item.ip}</p>
+            <p><strong>Details:</strong> {item.line}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* NETWORK RESULTS */}
+      <div>
+        <h3>🌐 Network Analysis</h3>
+        {networkAnalysis.length === 0 && <p>No network issues found</p>}
+        {networkAnalysis.map((item, index) => (
+          <div
+            key={index}
+            style={{
               border: "1px solid cyan",
               padding: "10px",
-               margin: "10px",
-             }}
-         >
-        <h4>{item.type}</h4>
-        <p>IP: {item.ip}</p>
-        <p>{item.detail}</p>
+              margin: "10px",
+            }}
+          >
+            <h4>{item.type}</h4>
+            <p>IP: {item.ip}</p>
+            <p>{item.detail}</p>
+          </div>
+        ))}
       </div>
-    ))}
-</div> 
-        </div>
-    );
+
+      {/* DISK RESULTS */}
+      <div>
+        <h3>💾 Disk Analysis</h3>
+        {diskAnalysis.length === 0 && <p>No disk data found</p>}
+        {diskAnalysis.map((item, index) => (
+          <div
+            key={index}
+            style={{
+              border: item.deleted ? "1px solid red" : "1px solid green",
+              padding: "10px",
+              margin: "10px",
+            }}
+          >
+            <p>{item.name}</p>
+            {item.deleted && <strong>⚠️ Deleted File</strong>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default Upload;
