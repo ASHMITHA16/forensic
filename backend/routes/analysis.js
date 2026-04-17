@@ -2,6 +2,9 @@ import express from "express";
 import analyzeDisk from "../agents/diskAgent.js";
 import analyzeLogs from "../agents/logAgent.js";
 import analyzeNetwork from "../agents/networkAgent.js";
+import analyzeMemory from "../agents/memoryAgent.js";
+import correlate from "../agents/correlationAgent.js";
+
 const router = express.Router();
 
 router.post("/analyze/log", async (req, res) => {
@@ -21,6 +24,17 @@ router.post("/analyze/log", async (req, res) => {
 });
 
 
+router.post("/analyze/memory", async (req, res) => {
+  try {
+    const { filePath } = req.body;
+
+    const result = analyzeMemory(filePath);
+
+    res.json({ data: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.post("/analyze/disk", async (req, res) => {
   try {
@@ -34,6 +48,14 @@ router.post("/analyze/disk", async (req, res) => {
   }
 });
 
+
+router.post("/analyze/correlate", async (req, res) => {
+  const { logData, networkData, memoryData, diskData } = req.body;
+
+  const result = correlate(logData, networkData, memoryData, diskData);
+
+  res.json({ data: result });
+});
 
 router.post("/analyze/network", async (req, res) => {
   try {

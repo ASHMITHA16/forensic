@@ -7,7 +7,8 @@ const Upload = () => {
   const [analysis, setAnalysis] = useState([]);
   const [networkAnalysis, setNetworkAnalysis] = useState([]);
   const [diskAnalysis, setDiskAnalysis] = useState([]);
-
+  const [memoryAnalysis, setMemoryAnalysis] = useState([]);
+  const [correlation, setCorrelation] = useState([]);
   const styles = {
     card: {
       background: "#0a0f1f",
@@ -112,6 +113,41 @@ const Upload = () => {
     }
   };
 
+
+const handleMemoryAnalysis = async () => {
+  if (!uploadedPath) {
+    alert("Upload file first!");
+    return;
+  }
+
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/api/analyze/memory",
+      { filePath: uploadedPath }
+    );
+
+    setMemoryAnalysis(res.data.data);
+  } catch (err) {
+    console.error(err);
+    alert("Memory analysis failed ❌");
+  }
+};
+
+
+
+const handleCorrelation = async () => {
+  const res = await axios.post(
+    "http://localhost:5000/api/analyze/correlate",
+    {
+      logData: analysis,
+      networkData: networkAnalysis,
+      memoryData: memoryAnalysis,
+      diskData: diskAnalysis,
+    }
+  );
+
+  setCorrelation(res.data.data);
+};
   return (
     <div style={{ padding: "20px" }}>
       <h2>🔍 Digital Forensic Upload</h2>
@@ -124,7 +160,9 @@ const Upload = () => {
       <button onClick={handleDiskAnalysis}>Analyze Disk</button>
       <button onClick={handleLogAnalysis}>Analyze Logs</button>
       <button onClick={handleNetworkAnalysis}>Analyze Network</button>
-
+      <button onClick={handleMemoryAnalysis}>Analyze Memory </button>
+      <button onClick={handleCorrelation}>🔥 Run Correlation</button>
+            
       {/* LOG RESULTS */}
       <div>
         <h3>📊 Log Analysis</h3>
@@ -176,6 +214,36 @@ const Upload = () => {
           </div>
         ))}
       </div>
+
+      <div>
+       <h3>🧠 Memory Analysis</h3>
+
+       {memoryAnalysis.length === 0 && <p>No memory issues found</p>}
+
+       {memoryAnalysis.map((item, index) => (
+         <div
+          key={index}
+          style={{
+          border: item.type === "Suspicious Process" ? "1px solid red" : "1px solid green",
+          padding: "10px",
+          margin: "10px",
+         }}
+      >
+         <p>{item.process}</p>
+         <strong>{item.type}</strong>
+         </div>
+        ))}
+      </div>
+      <div>
+        <h3>🔥 Correlation Results</h3>
+
+         {correlation.map((item, index) => (
+          <div key={index} style={{ border: "2px solid red", padding: "10px" }}>
+           <strong>{item.type}</strong>
+           <p>{item.message}</p>
+           </div>
+        ))}
+       </div>
     </div>
   );
 };
