@@ -22,7 +22,7 @@ const Dashboard = () => {
     <>
       <div className="page-header">
         <div>
-          <div className="page-title">// dashboard</div>
+          <div className="page-title">ForensiX</div>
           <div className="page-subtitle">ForensicOS · Digital Investigation Platform</div>
         </div>
       </div>

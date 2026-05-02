@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import "./forensic.css";
+import "./pages/forensic.css"; // Global styles for forensic pages
 
 import Sidebar   from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";

@@ -67,8 +67,8 @@ const AgentPage = ({ type }) => {
     <>
       <div className="page-header">
         <div>
-          <div className="page-title">{config.icon} // {type}_agent</div>
-          <div className="page-subtitle">{config.title} · Upload and analyze forensic evidence</div>
+          <div className="page-title">{config.icon} {type} Agent</div>
+          <div className="page-subtitle">{config.title}Upload and analyze forensic evidence</div>
         </div>
       </div>
 
