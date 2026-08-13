@@ -301,4 +301,4 @@ function runCorrelation({ logData = [], networkData = [], memoryData = [], diskD
   };
 }
 
-module.exports = { runCorrelation };
+export default runCorrelation;
