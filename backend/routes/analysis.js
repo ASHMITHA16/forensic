@@ -6,6 +6,7 @@ import analyzeMemory from "../agents/memoryAgent.js";
 import correlate from "../agents/correlationAgent.js";
 import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
+import History from "../models/History.js";
 
 const router = express.Router();
 // 🔐 Integrity Check Function
@@ -49,6 +50,7 @@ router.post("/analyze/log", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.post("/analyze/memory", async (req, res) => {
   try {
@@ -104,9 +106,28 @@ router.post("/analyze/network", async (req, res) => {
       });
     }
 
-    const result = await analyzeNetwork(filePath);
+     const result = await analyzeNetwork(filePath);
 
-    res.json({ data: result });
+    const risk =
+      result.length > 15
+        ? "high"
+        : result.length > 5
+        ? "medium"
+        : "low";
+  
+    await History.create({
+      agent: "network",
+      fileName: filePath.split("\\").pop(),
+      findings: result.length,
+      risk,
+      results: result
+    });
+
+    res.json({
+      message: "Analysis completed",
+      data: result
+    });
+
 
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import "./forensic.css";// adjust path to match your project structure
+import { useLocation } from "react-router-dom";
 
 const Upload = () => {
   const [file, setFile] = useState(null);
@@ -10,11 +11,27 @@ const Upload = () => {
   const [diskAnalysis, setDiskAnalysis] = useState([]);
   const [memoryAnalysis, setMemoryAnalysis] = useState([]);
   const [correlation, setCorrelation] = useState([]);
+  const location = useLocation();
+  const selectedAgent = location.state?.agent || "";
 
   // 📁 Select file
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
+  const selectedFile = e.target.files[0];
+
+  if (!selectedFile) return;
+
+  const ext = "." + selectedFile.name.split(".").pop().toLowerCase();
+
+  const allowed = acceptedTypes[selectedAgent]
+    ?.split(",");
+
+  if (!allowed.includes(ext)) {
+    alert(`Please upload a valid file for ${selectedAgent}`);
+    return;
+  }
+
+  setFile(selectedFile);
+};
 
   // 🚀 Upload file
   const handleUpload = async () => {
@@ -93,6 +110,12 @@ const Upload = () => {
     });
     setCorrelation(res.data.data);
   };
+  const acceptedTypes = {
+  "Disk Agent": ".img,.dd,.ad1",
+  "Log Agent": ".txt,.log",
+  "Memory Agent": ".raw,.mem",
+  "Network Agent": ".pcap,.pcapng"
+};
 
   return (
     <div className="forensic-wrapper">
@@ -105,7 +128,7 @@ const Upload = () => {
       {/* UPLOAD PANEL */}
       <div className="upload-panel">
         <div className="file-input-wrapper">
-          <input type="file" onChange={handleFileChange} />
+          <input type="file" accept={acceptedTypes[selectedAgent]} onChange={handleFileChange}/>
         </div>
         <div className="btn-group">
           <button className="btn btn-primary" onClick={handleUpload}>Upload File</button>

@@ -57,7 +57,7 @@ const Dashboard = () => {
               key={i}
               className="agent-card"
               style={{ animationDelay: `${i * 0.08}s` }}
-              onClick={() => navigate(a.path)}
+              onClick={() =>navigate(a.path)}
             >
               <div className="agent-card-icon">{a.icon}</div>
               <div className="agent-card-title">{a.title}</div>
