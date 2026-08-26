@@ -16,6 +16,8 @@ const AGENT_CONFIG = {
     endpoint: "/api/analyze/log",
     result: "/result/log",
     color: "#38bdf8",
+    description: "Normalize system events, identify attack indicators, and prepare evidence for cross-agent correlation.",
+    coverage: ["Authentication failures", "Unauthorized access", "Privilege escalation", "Suspicious commands", "Malware indicators", "IPv4 indicators"],
   },
   memory: {
     icon: "🧠",
@@ -104,6 +106,11 @@ const AgentPage = ({ type }) => {
     setLoading(true);
     setPhase("analyzing");
 
+    if (type === "log") {
+      sessionStorage.removeItem("result_log_meta");
+      sessionStorage.removeItem("result_log_id");
+    }
+
     try {
       const res = await axios.post(
         `http://localhost:5000${config.endpoint}`,
@@ -121,6 +128,13 @@ const AgentPage = ({ type }) => {
         `result_${type}_file`,
         file?.name || "unknown"
       );
+
+      if (type === "log" && res.data.meta) {
+        sessionStorage.setItem("result_log_meta", JSON.stringify(res.data.meta));
+        if (res.data.analysisId) {
+          sessionStorage.setItem("result_log_id", String(res.data.analysisId));
+        }
+      }
 
       navigate(config.result);
     } catch (err) {
@@ -222,6 +236,16 @@ const AgentPage = ({ type }) => {
             </div>
           )}
         </div>
+
+        {type === "log" && (
+          <div className="log-agent-guide">
+            <div className="section-title">📡 Detection coverage</div>
+            <p>{config.description}</p>
+            <div className="log-coverage-list">
+              {config.coverage.map((item) => <span key={item}>{item}</span>)}
+            </div>
+          </div>
+        )}
 
         <div className="section-title">
           ℹ About This Agent

@@ -26,6 +26,16 @@ const historySchema = new mongoose.Schema({
     default: []
   },
 
+  analysisMeta: {
+    type: Object,
+    default: {}
+  },
+
+  evidenceHash: {
+    type: String,
+    default: null
+  },
+
   createdAt: {
     type: Date,
     default: Date.now
