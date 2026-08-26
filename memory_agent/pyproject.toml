@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-analysis-agent"
+version = "1.0.0"
+description = "Evidence-integrity-first memory dump analysis agent for a multi-agent digital forensics framework"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+# Phase 1 deliberately has NO runtime dependencies. It must run on a bare
+# Python install so evidence can be sealed on any machine, including one
+# with no forensic toolchain and no network access.
+dependencies = []
+
+[project.optional-dependencies]
+# Added in Phase 2, when the Volatility 3 runner lands.
+analysis = ["volatility3>=2.28.0"]
+# Added in Phase 3, when the output schema is formalised.
+schema = ["pydantic>=2.0"]
+
+[project.scripts]
+memory-agent = "memory_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["memory_agent*"]

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Case workspaces contain evidence hashes and custody records.
+# Never commit them.
+memory_agent_cases/
+*.raw
+*.mem
+*.dmp
+*.vmem
