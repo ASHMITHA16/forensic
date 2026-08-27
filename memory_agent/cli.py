@@ -5,15 +5,22 @@ Command-line interface.
 
     python -m memory_agent verify <dump> --case-id DF-2026-001
     python -m memory_agent audit-verify <audit.jsonl>
-    python -m memory_agent analyze <dump> --case-id ...     (Phase 5)
+    python -m memory_agent analyze <dump> --case-id DF-2026-001
+    python -m memory_agent replay <raw-dir> --case-id DF-2026-001
+    python -m memory_agent rules
 
 Exit codes are meaningful, so this can be driven from a script or from
-the Node backend later without parsing prose:
+the Node backend without parsing prose:
 
     0  success
-    1  operational error (bad path, unwritable workspace, ...)
+    1  operational error (bad path, unwritable workspace, no Volatility)
     2  INTEGRITY FAILURE -- evidence or audit trail does not verify
-    3  not yet implemented (reserved for later phases)
+    3  not implemented for this input (e.g. a non-Windows image)
+
+``replay`` is the command to reach for without a memory image: it runs
+the normalisation, detection, timeline and IOC stages against captured
+plugin output. Its envelope is always INVALID, because no evidence was
+sealed -- that is the honest status, not a defect.
 """
 
 from __future__ import annotations
@@ -25,14 +32,19 @@ from pathlib import Path
 from typing import Any
 
 from .core.audit import AuditLog
-from .core.errors import AuditError, MemoryAgentError
+from .core.errors import (
+    AuditError,
+    MemoryAgentError,
+    OSIdentificationFailed,
+    UnsupportedOS,
+    VolatilityNotFound,
+)
 from .verify import AGENT_VERSION, run_verify
 
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_INTEGRITY_FAILURE = 2
 EXIT_NOT_IMPLEMENTED = 3
-
 
 # ── output helpers ────────────────────────────────────────────────────
 
@@ -262,25 +274,140 @@ def cmd_audit_verify(args: argparse.Namespace) -> int:
     return EXIT_OK if passed else EXIT_INTEGRITY_FAILURE
 
 
+def _print_findings(envelope: dict[str, Any], limit: int = 15) -> None:
+    findings = envelope.get("findings") or []
+    if not findings:
+        print("\n  No findings. Read the limitations below before concluding "
+              "anything from that.")
+        return
+
+    print(f"\n  findings ({len(findings)}, most severe first)")
+    for finding in findings[:limit]:
+        print(
+            f"    {finding['severity']:<8} {finding['confidence']:.2f}  "
+            f"{finding['rule_id']}  {finding['title']}"
+        )
+        entities = finding.get("entities") or {}
+        detail = ", ".join(
+            f"{k}={v}" for k, v in sorted(entities.items()) if v
+        )
+        if detail:
+            print(f"                          {detail[:110]}")
+    if len(findings) > limit:
+        print(f"    ... and {len(findings) - limit} more in the envelope")
+
+
+def _print_analysis_summary(envelope: dict[str, Any]) -> None:
+    from .report import summarise
+
+    print()
+    print(summarise(envelope))
+    _print_findings(envelope)
+
+    limitations = envelope.get("limitations") or []
+    if limitations:
+        print(f"\n  limitations ({len(limitations)})")
+        for item in limitations[:12]:
+            wrapped = item if len(item) <= 500 else item[:500] + "..."
+            print(f"    - {wrapped}")
+        if len(limitations) > 12:
+            print(f"    ... and {len(limitations) - 12} more in the envelope")
+
+    workspace = envelope.get("workspace") or {}
+    if workspace.get("envelope_path"):
+        print(f"\n  envelope   {workspace['envelope_path']}")
+        print(f"  audit      {workspace.get('audit_path')}")
+    print()
+
+
 def cmd_analyze(args: argparse.Namespace) -> int:
-    message = (
-        "Full analysis is not implemented yet.\n"
-        "\n"
-        "Phase 1 (this build) provides evidence sealing and chain of custody:\n"
-        "    python -m memory_agent verify <dump> --case-id <id>\n"
-        "\n"
-        "Still to come, per the approved design:\n"
-        "    Phase 2  Volatility 3 runner, OS identification, plugin planner\n"
-        "    Phase 3  Extractors -> normalised observations\n"
-        "    Phase 4  Detection rule engine (rule pack v1)\n"
-        "    Phase 5  Timeline, IOCs, full output envelope  <- 'analyze' works here\n"
-        "    Phase 6  AutoGen adapter and test corpus\n"
-    )
+    from .analyze import run_analysis
+
+    acquisition = {
+        "acquired_utc": args.acquired_utc,
+        "tool": args.acquisition_tool,
+        "method": args.acquisition_method,
+    }
+    progress = _Progress("hashing", enabled=not args.quiet)
+
+    try:
+        envelope = run_analysis(
+            dump_path=args.dump,
+            case_id=args.case_id,
+            evidence_id=args.evidence_id,
+            investigator=args.investigator,
+            acquisition=acquisition,
+            deep=args.deep,
+            plugin_timeout_s=args.timeout,
+            output_dir=args.output_dir,
+            vol_command=args.vol,
+            only=args.only,
+            allowlist_vendor=args.allowlist_vendor,
+            progress=progress,
+        )
+    except (UnsupportedOS, OSIdentificationFailed) as exc:
+        _emit_error(exc, as_json=args.json)
+        return EXIT_NOT_IMPLEMENTED
+    except VolatilityNotFound as exc:
+        _emit_error(exc, as_json=args.json)
+        return EXIT_ERROR
+    finally:
+        progress.done()
+
     if args.json:
-        print(json.dumps({"error_code": "MA-E-900", "message": message.strip()}, indent=2))
-    else:
-        print(message, file=sys.stderr)
-    return EXIT_NOT_IMPLEMENTED
+        print(json.dumps(envelope, indent=2, ensure_ascii=False))
+    elif not args.quiet:
+        _print_analysis_summary(envelope)
+
+    status = (envelope.get("agent") or {}).get("status")
+    return EXIT_INTEGRITY_FAILURE if status == "INVALID" else EXIT_OK
+
+
+def cmd_replay(args: argparse.Namespace) -> int:
+    from .analyze import replay_analysis
+
+    envelope = replay_analysis(
+        raw_dir=args.raw_dir,
+        case_id=args.case_id,
+        os_family=args.os_family,
+        deep=args.deep,
+        output_dir=args.output_dir,
+        investigator=args.investigator,
+        allowlist_vendor=args.allowlist_vendor,
+    )
+
+    if args.json:
+        print(json.dumps(envelope, indent=2, ensure_ascii=False))
+    elif not args.quiet:
+        _print_analysis_summary(envelope)
+
+    # A replay is not an integrity failure, so it exits 0 despite the
+    # INVALID stamp. Returning 2 would make every CI run of the fixture
+    # corpus look like a tampering incident.
+    return EXIT_OK
+
+
+def cmd_rules(args: argparse.Namespace) -> int:
+    from .detectors import RULE_PACK
+    from .core.schema import RULE_PACK_VERSION
+
+    if args.json:
+        print(json.dumps(
+            {"rule_pack": RULE_PACK_VERSION,
+             "rules": [r.to_dict() for r in RULE_PACK]},
+            indent=2,
+        ))
+        return EXIT_OK
+
+    print(f"\nrule pack {RULE_PACK_VERSION} -- {len(RULE_PACK)} rules\n")
+    for rule in RULE_PACK:
+        print(f"  {rule.rule_id}  v{rule.version}  {rule.severity:<8} "
+              f"base {rule.base_confidence:.2f}  {rule.title}")
+        print(f"             {rule.description}")
+        if rule.mitre_attack:
+            print(f"             ATT&CK: {', '.join(rule.mitre_attack)}")
+        print()
+    return EXIT_OK
 
 
 def _emit_error(exc: MemoryAgentError, as_json: bool) -> None:
@@ -378,12 +505,101 @@ def build_parser() -> argparse.ArgumentParser:
     # analyze ---------------------------------------------------------
     p_analyze = sub.add_parser(
         "analyze",
-        help="full memory analysis (available from Phase 5)",
+        help="seal, identify, run Volatility, and produce the full envelope",
+        description=(
+            "Run the complete pipeline: seal the evidence, identify the OS, "
+            "execute the plugin plan, normalise the output into observations, "
+            "evaluate rule pack v1, build the timeline, extract indicators, "
+            "re-verify the evidence and emit a validated output envelope. "
+            "Requires Volatility 3."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_analyze.add_argument("dump", help="path to the memory dump")
-    p_analyze.add_argument("--case-id", required=True)
-    p_analyze.add_argument("--json", action="store_true")
+    p_analyze.add_argument("--case-id", required=True,
+                           help="case identifier, e.g. DF-2026-001")
+    p_analyze.add_argument("--evidence-id",
+                           help="evidence identifier (auto-generated if omitted)")
+    p_analyze.add_argument("--investigator",
+                           help="name of the investigator taking custody")
+    p_analyze.add_argument("--acquired-utc",
+                           help="when the dump was acquired (RFC-3339). Supply "
+                                "this to have clock skew computed.")
+    p_analyze.add_argument("--acquisition-tool", help="tool used to acquire")
+    p_analyze.add_argument("--acquisition-method", help="acquisition method")
+    p_analyze.add_argument(
+        "-o", "--output-dir",
+        help="where to create the case workspace (default: ./memory_agent_cases)",
+    )
+    p_analyze.add_argument(
+        "--deep", action="store_true",
+        help="also run the expensive plugins (handles, filescan, mutantscan, "
+             "registry). Substantially slower.",
+    )
+    p_analyze.add_argument(
+        "--timeout", type=int, default=300, metavar="SECONDS",
+        help="base per-plugin timeout; each plugin scales it by its own cost "
+             "factor (default: 300)",
+    )
+    p_analyze.add_argument(
+        "--vol", help="path to the Volatility 3 executable, if it is not on PATH",
+    )
+    p_analyze.add_argument(
+        "--only", nargs="+", metavar="PLUGIN",
+        help="run only these plugins (for triage or debugging). Coverage is "
+             "reduced accordingly and the envelope says so.",
+    )
+    p_analyze.add_argument(
+        "--allowlist-vendor", action="store_true",
+        help="exclude Microsoft and cloud-vendor address ranges from the IOC "
+             "list. Off by default: C2 is routinely hosted there.",
+    )
+    p_analyze.add_argument("--json", action="store_true",
+                           help="emit the envelope as JSON on stdout")
+    p_analyze.add_argument("-q", "--quiet", action="store_true")
     p_analyze.set_defaults(func=cmd_analyze)
+
+    # replay ----------------------------------------------------------
+    p_replay = sub.add_parser(
+        "replay",
+        help="run the analysis stages against captured plugin output",
+        description=(
+            "Normalise, detect, build a timeline and extract indicators from a "
+            "directory of <plugin>.json files -- the raw/ directory of a "
+            "previous run, or the bundled test fixtures. No memory image and "
+            "no Volatility install are required.\n\n"
+            "The resulting envelope is always stamped INVALID because no "
+            "evidence was sealed. That is the correct status for a replayed "
+            "run, not a malfunction."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_replay.add_argument("raw_dir",
+                          help="directory of captured <plugin>.json files")
+    p_replay.add_argument("--case-id", required=True)
+    p_replay.add_argument("--os-family", default="windows",
+                          choices=["windows", "linux"],
+                          help="OS family the captured output came from")
+    p_replay.add_argument("--investigator")
+    p_replay.add_argument("-o", "--output-dir")
+    p_replay.add_argument("--deep", action="store_true")
+    p_replay.add_argument("--allowlist-vendor", action="store_true")
+    p_replay.add_argument("--json", action="store_true")
+    p_replay.add_argument("-q", "--quiet", action="store_true")
+    p_replay.set_defaults(func=cmd_replay)
+
+    # rules -----------------------------------------------------------
+    p_rules = sub.add_parser(
+        "rules",
+        help="list the detection rules, their versions and their thresholds",
+        description=(
+            "Print rule pack v1. Every rule's id, version, severity and base "
+            "confidence are shown, because a reviewer is entitled to disagree "
+            "with a threshold and cannot do so without seeing it."
+        ),
+    )
+    p_rules.add_argument("--json", action="store_true")
+    p_rules.set_defaults(func=cmd_rules)
 
     return parser
 

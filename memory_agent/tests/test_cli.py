@@ -251,13 +251,75 @@ class TestCliAuditVerify(CliTestBase):
         self.assertIn("BROKEN", out)
 
 
-class TestCliAnalyzeStub(CliTestBase):
-    def test_analyze_reports_not_implemented(self):
-        code, _out, err = self.run_cli(
-            ["analyze", str(self.dump), "--case-id", "C1"]
-        )
-        self.assertEqual(code, EXIT_NOT_IMPLEMENTED)
-        self.assertIn("Phase 5", err)
+class TestCliAnalyze(CliTestBase):
+    """
+    ``analyze`` runs the real pipeline now, so what is testable without
+    Volatility installed is its failure behaviour -- which is the part
+    that matters most anyway. An operator with no toolchain must get an
+    actionable message and a non-zero exit, not a traceback and not an
+    empty result that reads as "nothing found".
+    """
+
+    def test_missing_volatility_exits_with_an_actionable_message(self):
+        code, _out, err = self.run_cli([
+            "analyze", str(self.dump), "--case-id", "C1",
+            "-o", str(self.cases), "--vol", "/nonexistent/vol-binary",
+        ])
+        self.assertEqual(code, EXIT_ERROR)
+        self.assertIn("MA-E-40", err)
+        self.assertIn("pip install volatility3", err)
+
+    def test_the_failure_is_not_reported_as_an_empty_analysis(self):
+        code, out, _err = self.run_cli([
+            "analyze", str(self.dump), "--case-id", "C1",
+            "-o", str(self.cases), "--vol", "/nonexistent/vol-binary",
+        ])
+        self.assertNotEqual(code, EXIT_OK)
+        self.assertNotIn("findings", out)
+
+
+class TestCliReplay(CliTestBase):
+    def test_replay_runs_the_analysis_stages_without_a_dump(self):
+        from memory_agent.tests.fixtures import WINDOWS_CASE
+
+        code, out, _err = self.run_cli([
+            "replay", str(WINDOWS_CASE), "--case-id", "C1",
+            "-o", str(self.cases),
+        ])
+        # An INVALID envelope, but a successful run: exiting 2 here would
+        # make every CI run of the corpus look like a tampering incident.
+        self.assertEqual(code, EXIT_OK)
+        self.assertIn("INVALID", out)
+        self.assertIn("findings", out)
+
+    def test_replay_json_output_is_a_valid_envelope(self):
+        from memory_agent.core.schema import validate_envelope
+        from memory_agent.tests.fixtures import WINDOWS_CASE
+
+        code, out, _err = self.run_cli([
+            "replay", str(WINDOWS_CASE), "--case-id", "C1",
+            "-o", str(self.cases), "--json",
+        ])
+        self.assertEqual(code, EXIT_OK)
+        envelope = json.loads(out)
+        self.assertEqual(validate_envelope(envelope, strict=False), [])
+
+
+class TestCliRules(CliTestBase):
+    def test_rules_lists_the_pack_with_its_thresholds(self):
+        code, out, _err = self.run_cli(["rules"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertIn("MEM-P-001", out)
+        self.assertIn("MEM-S-001", out)
+        # A reviewer cannot disagree with a threshold they cannot see.
+        self.assertIn("base 0.", out)
+
+    def test_rules_json_carries_every_rule(self):
+        code, out, _err = self.run_cli(["rules", "--json"])
+        self.assertEqual(code, EXIT_OK)
+        payload = json.loads(out)
+        self.assertEqual(len(payload["rules"]), 17)
+        self.assertEqual(payload["rule_pack"], "v1.0")
 
 
 if __name__ == "__main__":

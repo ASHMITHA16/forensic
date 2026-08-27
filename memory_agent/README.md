@@ -3,9 +3,15 @@
 A modular, evidence-integrity-first memory dump analysis agent for the AI-based
 multi-agent digital forensics framework.
 
-**Current build: Phase 1 — evidence sealing and chain of custody.**
-Runs on a bare Python 3.10+ install with **zero third-party dependencies** and
-**no forensic toolchain required**.
+**Current build: Phases 1–6 complete.** Evidence sealing, Volatility 3
+execution, normalisation, a 17-rule deterministic detection pack, timeline
+reconstruction, IOC extraction, the validated output envelope, and the AutoGen
+adapter.
+
+Runs on a bare Python 3.10+ install with **zero third-party dependencies**.
+Volatility 3 is needed only to analyse a real memory image — the analytical half
+of the pipeline runs against captured plugin output with `replay`, so rules can
+be developed and demonstrated on any machine.
 
 This package is entirely self-contained. It does not import, modify, or depend
 on the Node.js backend in `backend/` or the React frontend in `Digital/`.
@@ -129,14 +135,61 @@ see — the anchor catches it:
                      the trail was rewritten in full
 ```
 
+### Run a full analysis
+
+```bash
+python -m memory_agent analyze /evidence/memdump.raw \
+    --case-id DF-2026-001 \
+    --investigator "A. Analyst" \
+    --acquired-utc 2026-04-12T02:25:00Z \
+    -o /cases
+```
+
+Seals the evidence, identifies the OS, runs the plugin plan, normalises the
+output, evaluates the rule pack, builds the timeline, extracts indicators,
+re-verifies the evidence, and writes a validated envelope.
+
+| Flag | Effect |
+|---|---|
+| `--deep` | also run `handles`, `filescan`, `mutantscan`, `registry.hivelist`. Substantially slower. |
+| `--timeout N` | base per-plugin budget; each plugin scales it by its own cost factor |
+| `--vol PATH` | Volatility executable, if it is not on `PATH` |
+| `--only P1 P2` | run only these plugins. Coverage drops accordingly, and the envelope names the rules that lost their input. |
+| `--allowlist-vendor` | drop Microsoft and cloud ranges from the IOC list. Off by default: C2 is routinely hosted there. |
+| `--json` | write the envelope to stdout |
+
+Supplying `--acquired-utc` is what makes `clock_skew_seconds` computable. Without
+it the field stays `null` — an unknown skew is reported as unknown rather than
+assumed to be zero.
+
+### Analyse without a memory image
+
+```bash
+python -m memory_agent replay memory_agent/tests/fixtures/windows_case \
+    --case-id DF-DEMO-001
+```
+
+Runs stages S4–S8 against captured plugin output — the bundled fixture corpus, or
+the `raw/` directory of any previous run. No Volatility, no dump.
+
+### List the rule pack
+
+```bash
+python -m memory_agent rules          # or --json
+```
+
+Every rule with its version, severity, base confidence and ATT&CK mapping. A
+reviewer is entitled to disagree with a threshold and cannot do so without
+seeing it.
+
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | Success |
-| `1` | Operational error (bad path, unwritable workspace) |
+| `1` | Operational error (bad path, unwritable workspace, no Volatility) |
 | `2` | **Integrity failure** — evidence or audit trail did not verify |
-| `3` | Not implemented in this phase |
+| `3` | Not implemented for this input (e.g. a non-Windows image) |
 
 Machine-readable, so the CLI can be driven from a script or another process
 without parsing prose.
@@ -161,10 +214,10 @@ is immune to all three.
 memory_agent_cases/<case_id>/<run_id>/
 ├── audit.jsonl                 tamper-evident hash-chained action log
 ├── custody.json                chain-of-custody record
-├── raw/                        verbatim Volatility output      (Phase 2+)
-├── cache/                      Volatility scan cache           (Phase 2+)
-├── artifacts/                  dumped regions                  (Phase 4+)
-└── memory_agent_output.json    final envelope                  (Phase 5+)
+├── raw/                        verbatim Volatility output, per plugin
+├── cache/                      Volatility scan cache and temp files
+├── artifacts/                  dumped regions
+└── memory_agent_output.json    the validated output envelope
 ```
 
 ---
@@ -214,8 +267,12 @@ record never asserts an identity that was never established.
 By default `verify` does not re-read the dump after sealing: nothing happens in
 between, so a second full pass over 32 GB costs minutes to prove that two
 seconds changed nothing. The report says `verification_method: "seal_only"`.
-Pass `--paranoid` to force the re-read. From Phase 2, where plugins run in
-between, the re-read becomes mandatory.
+Pass `--paranoid` to force the re-read.
+
+`analyze` is different: the re-read is **mandatory** there and not configurable.
+An external tool has just been pointed at the evidence twenty times, and
+confirming the file is byte-identical afterwards is the entire basis for
+claiming the analysis did not alter it.
 
 **4. Hash-chained audit trail.** Every action appends one JSON line embedding
 the SHA-256 of the previous line:
@@ -274,10 +331,105 @@ untouched.
 
 ---
 
-## Preparing for Phase 2
+## Observation vs interpretation
 
-Phase 2 adds the Volatility 3 runner, OS identification, and the plugin planner.
-Installing the toolchain now means Phase 2 is runnable the moment it lands.
+This is the property the whole design exists to deliver, so it is worth being
+precise about the mechanism rather than just claiming it.
+
+**Tier 2 records facts.** An observation may not contain a judgement. There is no
+`suspicious` field, no `severity`, no `confidence`. `ldrmodules` reporting a
+module missing from all three PEB lists produces three booleans — not a field
+called `hidden`. The schema *enforces* this: `validate_observation` rejects any
+observation carrying a verdict field, and a test asserts no extractor emits one.
+
+**Tier 3 interprets, and shows its working.** Every finding carries four
+separate fields:
+
+```jsonc
+"observation_statement": "The VAD at 0x2a0000 in PID 2456 is private, is marked
+                          PAGE_EXECUTE_READWRITE, and its first bytes are 4d 5a.",
+"interpretation":        "Consistent with reflective PE injection.",
+"alternative_explanations": [
+    "Just-in-time compilation. .NET, JavaScript and JVM engines allocate exactly
+     this kind of region during normal execution, and this is by a wide margin
+     the most common cause.",
+    "A legitimate packed or self-extracting application." ],
+"analyst_action":        "Dump the region and examine it statically."
+```
+
+`alternative_explanations` may not be empty — that is a schema violation, not a
+stylistic lapse. The field exists so a downstream LLM cannot treat a rule hit as
+settled fact, and a rule author who cannot name a benign cause has not finished
+thinking about the rule.
+
+**Confidence is arithmetic.**
+
+```
+confidence = clamp(base_confidence + Σ adjustments, 0.0, 0.95)
+```
+
+Every term appears in `confidence_basis` in plain text, including the
+corroboration bonuses added after all rules have run. The 0.95 ceiling is a
+design commitment: this agent examines one evidence domain and never asserts
+certainty.
+
+## Absence is never silent
+
+The most dangerous output a memory forensics tool can produce is a confident
+empty findings list on a compromised machine. Three mechanisms prevent it.
+
+**Tri-state cross-view.** `cross_view.pslist` is `false` only when `pslist` ran
+and did not return the process; it is `null` when `pslist` did not run. Rules
+test `is False`, never falsy. Without this, a `pslist` timeout would manufacture
+a CRITICAL hidden-process finding on a healthy machine.
+
+**Rules report `not_evaluated`.** When a plugin a rule depends on fails, the rule
+is not run and is recorded with the reason, and `limitations` says so in as many
+words: *"MEM-I-001 was NOT evaluated because windows.malfind (timeout). Absence
+of this finding type is therefore not evidence of its absence on the system."*
+
+**Rule isolation.** A rule that raises is recorded as errored; the other sixteen
+still run. Losing sixteen findings to one unexpected `None` would be a failure at
+the thing the tool exists to do.
+
+## The timeline is honest about what it knows
+
+A memory image yields very few real timestamps. Every event declares its
+`precision`:
+
+| Precision | Meaning | `timestamp_utc` |
+|---|---|---|
+| `exact` | read from the artifact itself | present |
+| `approximate` | derived from a related artifact, bounded and explained | present |
+| `relative` | no timestamp; ordering inferred | **null** |
+| `unknown` | present in the image, not placeable in time | **null** |
+
+`relative` and `unknown` events carry a null timestamp and the schema enforces
+it. Rendering an inferred ordering as a time is exactly the confusion the
+precision field exists to prevent — and it is how a correlation agent ends up
+interleaving an invented memory timestamp with a real MFT timestamp and
+reporting a sequence of events that never happened.
+
+## Reproducibility, scoped honestly
+
+"Same dump ⇒ byte-identical output" is false as stated: the envelope carries a
+run id, wall-clock timestamps and durations. The claim that *is* true, and is
+checked by `tests/test_pipeline.py`:
+
+```python
+from memory_agent.report import core_digest
+core_digest(run_a) == core_digest(run_b)   # same evidence, same rule pack
+```
+
+`report.deterministic_core` strips everything that legitimately varies and
+returns the analysis itself — observations, findings, timeline, indicators,
+coverage, limitations. Identifiers are allocated from sorted order, so two runs
+over the same input produce the same `obs_id`s and the two envelopes can simply
+be diffed.
+
+---
+
+## Running a full analysis
 
 ### Install Volatility 3
 
@@ -306,8 +458,12 @@ server on first use, so no manual symbol setup is needed for Windows dumps.
 Linux dumps require an ISF file matching the exact kernel build — the usual
 place demos fail, which is why Phase 1 targets Windows first.
 
-The agent will locate `vol` via a configurable path rather than a hardcoded one,
-so it works on any machine.
+The agent locates `vol` by trying, in order: `--vol <path>`, the `VOLATILITY_BIN`
+environment variable, `vol` / `vol.py` / `volatility3` on `PATH`, and finally
+`python -m volatility3.cli`. It confirms the executable identifies itself as
+Volatility 3 before running anything, and records the version in the envelope —
+running plugins against an unidentified binary and reporting the results as
+forensic findings would not be defensible.
 
 ### Get a test memory dump
 
@@ -326,9 +482,26 @@ iterate on than a modern 16 GB Windows 11 dump.
 
 ### Test without any dump at all
 
-Tiers 2 and 3 consume JSON, not memory images. From Phase 3 onward the
-detection rules are unit-tested against fixture observation files, so rule
-development is never blocked on having a dump or a working Volatility install.
+Tiers 2 and 3 consume JSON, not memory images:
+
+```bash
+python -m memory_agent replay memory_agent/tests/fixtures/windows_case \
+    --case-id DF-DEMO-001
+```
+
+That runs normalisation, all 17 rules, the timeline and IOC extraction against a
+bundled fixture corpus, and writes a complete envelope. The corpus is a synthetic
+Windows incident built to trigger every rule in the pack *and* to include the
+benign look-alikes each rule has to survive — a JIT region in Chrome beside an
+injected region in a dropper, an HTTPS connection beside a connection to port
+4444.
+
+A replayed envelope is always stamped `INVALID`. No evidence was sealed, so
+nothing in it is admissible; that is the correct status, not a malfunction.
+
+The same command works on the `raw/` directory of any previous real run, which
+is how a finished case can be re-analysed under a newer rule pack without
+touching the evidence again.
 
 ---
 
@@ -337,11 +510,23 @@ development is never blocked on having a dump or a working Volatility install.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **1** | Evidence integrity, audit trail, workspace, CLI | **complete** |
-| 2 | Volatility 3 runner, OS identification, plugin planner | next |
-| 3 | Extractors → normalised observations | |
-| 4 | Detection rule engine (rule pack v1, 17 rules) | |
-| 5 | Timeline, IOC extraction, full output envelope | |
-| 6 | AutoGen adapter, fixture corpus | |
+| **2** | Volatility 3 runner, OS identification, plugin planner | **complete** |
+| **3** | Extractors → normalised observations, schema contract | **complete** |
+| **4** | Detection rule engine (rule pack v1, 17 rules) | **complete** |
+| **5** | Timeline, IOC extraction, full output envelope | **complete** |
+| **6** | AutoGen adapter, fixture corpus, 301 tests | **complete** |
+
+### Not covered by this build
+
+- **Linux and macOS images.** The planner has a Linux plugin plan and will
+  execute it, retaining the raw output, but there are no Linux extractors: no
+  observations, findings, timeline or IOCs are derived. The envelope says so
+  rather than emitting an empty analysis. macOS is refused outright.
+- **Registry, handle and file-object analysis.** Available behind `--deep`, but
+  no rules consume them yet.
+- **Anything requiring the disk.** Every rule reasons from memory alone. Where a
+  question needs the filesystem or the registry hive on disk, the finding's
+  `analyst_action` says so.
 
 ---
 
@@ -353,9 +538,28 @@ memory_agent/
 │   ├── errors.py       exception hierarchy with stable machine-readable codes
 │   ├── evidence.py     hashing, read-only access, sealing, chain of custody
 │   ├── audit.py        hash-chained tamper-evident JSONL trail
-│   └── workspace.py    isolated per-run case workspace
-├── verify.py           Phase 1 pipeline
+│   ├── workspace.py    isolated per-run case workspace
+│   ├── rows.py         tolerant readers for Volatility's unstable column names
+│   ├── runner.py       Volatility 3 subprocess wrapper, timeouts, capture
+│   ├── profile.py      OS identification cascade, clock anchoring
+│   ├── planner.py      OS → plugin plan, with the rules each plugin feeds
+│   └── schema.py       THE CONTRACT — records and validation, zero-dependency
+├── extractors/         TIER 2  rows → judgement-free observations
+│   ├── base.py         shared machinery, tri-state plugin availability
+│   ├── processes.py  network.py  commands.py
+│   └── modules.py    injection.py  services.py
+├── detectors/          TIER 3  observations → findings
+│   ├── engine.py       rule runner, isolation, confidence arithmetic
+│   └── rules/          process, injection, network, command, module, service
+├── synthesis/
+│   ├── timeline.py     precision-labelled events
+│   └── iocs.py         extraction, allowlisting, dedup, defanging
+├── report.py           envelope assembly, validation, deterministic core
+├── verify.py           the sealing pipeline (Phase 1)
+├── analyze.py          the full pipeline, S0–S8, plus replay
+├── autogen_adapter.py  the only file that knows AutoGen exists
 ├── cli.py              command-line interface
-├── tests/              79 tests, stdlib unittest, no dependencies
+├── tests/              301 tests, stdlib unittest, no dependencies
+│   └── fixtures/       captured plugin output for a synthetic Windows case
 └── docs/DESIGN.md      approved architecture and output contracts
 ```

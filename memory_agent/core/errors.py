@@ -119,7 +119,7 @@ class AuditChainBroken(AuditError):
     code = "MA-E-301"
 
 
-# ── Toolchain errors (used from Phase 2 onward) ───────────────────────
+# ── Toolchain errors ──────────────────────────────────────────────────
 
 class ToolchainError(MemoryAgentError):
     """Base class for problems with the external forensic toolchain."""
@@ -131,3 +131,123 @@ class VolatilityNotFound(ToolchainError):
     """Volatility 3 is not installed or not on the configured path."""
 
     code = "MA-E-401"
+
+
+class VolatilityUnusable(ToolchainError):
+    """
+    A Volatility executable was located but does not behave like one.
+
+    Raised when the version probe fails, times out, or returns output that
+    does not identify itself as Volatility 3. Running plugins against an
+    unidentified binary and reporting the results as forensic findings
+    would be indefensible -- the toolchain version is part of the record.
+    """
+
+    code = "MA-E-402"
+
+
+class PluginExecutionError(ToolchainError):
+    """
+    A plugin could not be executed at all (not merely failed).
+
+    Individual plugin *failures* are recorded in ``execution[]`` and
+    degrade coverage; they do not raise. This is reserved for conditions
+    that stop the runner functioning, such as the raw output directory
+    becoming unwritable mid-run.
+    """
+
+    code = "MA-E-403"
+
+
+# ── OS profiling errors ───────────────────────────────────────────────
+
+class ProfileError(MemoryAgentError):
+    """Base class for failures to characterise the memory image."""
+
+    code = "MA-E-500"
+
+
+class OSIdentificationFailed(ProfileError):
+    """
+    Every identification method failed.
+
+    The run aborts here rather than continuing with a guessed plugin set.
+    Executing Windows plugins against an unidentified image yields either
+    nothing or -- worse -- rows carved out of coincidental byte patterns,
+    which would enter the record as observations.
+    """
+
+    code = "MA-E-501"
+
+
+class UnsupportedOS(ProfileError):
+    """The image was identified, but this build has no plugin plan for it."""
+
+    code = "MA-E-502"
+
+
+# ── Normalisation errors ──────────────────────────────────────────────
+
+class ExtractionError(MemoryAgentError):
+    """Base class for failures converting plugin rows into observations."""
+
+    code = "MA-E-600"
+
+
+class MalformedPluginOutput(ExtractionError):
+    """
+    Plugin output parsed as JSON but is not the shape an extractor
+    expects -- a bare scalar where a list of rows was required, say.
+
+    Treated as a per-plugin failure and recorded in ``limitations``, never
+    as a reason to abandon the whole run.
+    """
+
+    code = "MA-E-601"
+
+
+# ── Detection errors ──────────────────────────────────────────────────
+
+class DetectionError(MemoryAgentError):
+    """Base class for failures inside the rule engine."""
+
+    code = "MA-E-700"
+
+
+class RuleFailed(DetectionError):
+    """
+    One rule raised while evaluating.
+
+    The engine isolates this: the rule is recorded as errored, every other
+    rule still runs, and the lost coverage is stated in the envelope. A
+    single bad rule must not cost the investigator every other finding.
+    """
+
+    code = "MA-E-701"
+
+
+class DuplicateRuleId(DetectionError):
+    """Two rules claim the same rule_id -- a rule-pack packaging error."""
+
+    code = "MA-E-702"
+
+
+# ── Schema / contract errors ──────────────────────────────────────────
+
+class SchemaError(MemoryAgentError):
+    """Base class for violations of the published output contract."""
+
+    code = "MA-E-800"
+
+
+class SchemaValidationError(SchemaError):
+    """
+    The assembled envelope does not satisfy the contract.
+
+    Raised at the end of a run, after the evidence has been re-sealed. The
+    downstream correlation agent is entitled to assume the contract holds;
+    emitting a malformed envelope would push the failure into another
+    agent where it is far harder to diagnose.
+    """
+
+    code = "MA-E-801"
