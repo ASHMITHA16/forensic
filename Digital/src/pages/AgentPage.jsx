@@ -45,7 +45,7 @@ const AgentPage = ({ type }) => {
   const [phase, setPhase] = useState("idle");
 
   const acceptedTypes = {
-    disk: ".img,.dd,.ad1",
+    disk: ".img,.dd,.ad1,.raw",
     log: ".txt,.log",
     memory: ".raw,.mem",
     network: ".pcap,.pcapng",
@@ -110,6 +110,10 @@ const AgentPage = ({ type }) => {
       sessionStorage.removeItem("result_log_meta");
       sessionStorage.removeItem("result_log_id");
     }
+    if (type === "disk") {
+      sessionStorage.removeItem("result_disk_meta");
+      sessionStorage.removeItem("result_disk_id");
+    }
 
     try {
       const res = await axios.post(
@@ -133,6 +137,13 @@ const AgentPage = ({ type }) => {
         sessionStorage.setItem("result_log_meta", JSON.stringify(res.data.meta));
         if (res.data.analysisId) {
           sessionStorage.setItem("result_log_id", String(res.data.analysisId));
+        }
+      }
+
+      if (type === "disk" && res.data.meta) {
+        sessionStorage.setItem("result_disk_meta", JSON.stringify(res.data.meta));
+        if (res.data.analysisId) {
+          sessionStorage.setItem("result_disk_id", String(res.data.analysisId));
         }
       }
 

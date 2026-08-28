@@ -20,7 +20,7 @@ const analyzeNetwork = (filePath) => {
       if (error) {
         console.log("TSHARK ERROR:", error);
         console.log(stderr);
-        reject(error);
+        resolve([]); // resolve with empty so the route doesn't crash
         return;
       }
 
