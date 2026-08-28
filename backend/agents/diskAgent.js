@@ -107,6 +107,74 @@ async function detectPartitionOffset(imagePath) {
 }
 
 /**
+ * Filesystem types to try when auto-detection fails.
+ * Ordered by frequency in forensic images.
+ */
+const FS_TYPES = ["fat16", "fat32", "ntfs", "ext2", "ext3", "ext4", "fat"];
+
+/**
+ * Run fls with automatic filesystem-type fallback.
+ *
+ * Strategy:
+ *   1. Try fls without -f (let Sleuth Kit auto-detect) — works for
+ *      partitioned images and most NTFS volumes.
+ *   2. If stdout is empty, retry with each type in FS_TYPES until
+ *      one produces output — handles raw FAT16/FAT32 volumes that
+ *      have no MBR/GPT and cannot be auto-detected.
+ *
+ * Returns { stdout, fsType } where fsType is "auto" or the -f value used.
+ */
+async function runFlsWithFallback(imagePath, offsetFlag) {
+  // Attempt 1 — auto-detect (works for partitioned + most NTFS)
+  const autoCmd = `"${FLS_PATH}" -r -p ${offsetFlag} "${imagePath}"`.trim();
+  console.log(`[DiskAgent] fls (auto): ${autoCmd}`);
+  const auto = await runCommand(autoCmd);
+
+  if (auto.stdout && auto.stdout.trim().length > 0) {
+    return { stdout: auto.stdout, fsType: "auto" };
+  }
+
+  console.log(`[DiskAgent] fls auto-detect returned no output — trying explicit filesystem types`);
+
+  // Attempt 2 — try each filesystem type explicitly
+  for (const fsType of FS_TYPES) {
+    const cmd = `"${FLS_PATH}" -f ${fsType} -r -p ${offsetFlag} "${imagePath}"`.trim();
+    console.log(`[DiskAgent] fls -f ${fsType}: ${cmd}`);
+    const result = await runCommand(cmd);
+    if (result.stdout && result.stdout.trim().length > 0) {
+      console.log(`[DiskAgent] fls succeeded with -f ${fsType}`);
+      return { stdout: result.stdout, fsType };
+    }
+  }
+
+  // Nothing worked — return empty
+  console.warn(`[DiskAgent] fls produced no output with any filesystem type`);
+  return { stdout: "", fsType: "unknown" };
+}
+
+/**
+ * Run fsstat with automatic filesystem-type fallback.
+ * Same strategy as runFlsWithFallback.
+ */
+async function runFsstatWithFallback(imagePath, offsetFlag) {
+  const autoCmd = `"${FSSTAT_PATH}" ${offsetFlag} "${imagePath}"`.trim();
+  const auto = await runCommand(autoCmd);
+  if (auto.stdout && auto.stdout.trim().length > 0) {
+    return auto.stdout;
+  }
+
+  for (const fsType of FS_TYPES) {
+    const cmd = `"${FSSTAT_PATH}" -f ${fsType} ${offsetFlag} "${imagePath}"`.trim();
+    const result = await runCommand(cmd);
+    if (result.stdout && result.stdout.trim().length > 0) {
+      return result.stdout;
+    }
+  }
+
+  return "";
+}
+
+/**
  * Parse one line of `fls -r -p` output into a structured entry.
  *
  * fls recursive + full-path format:
@@ -266,20 +334,21 @@ const analyzeDisk = async (filePath) => {
 
   const offsetFlag = partitionOffset > 0 ? `-o ${partitionOffset}` : "";
 
-  // ── Step 2: Run fls — recursive, full paths ────────────────
-  const flsCmd = `"${FLS_PATH}" -r -p ${offsetFlag} "${fullPath}"`.trim();
-  console.log(`[DiskAgent] fls: ${flsCmd}`);
-  const { stdout: flsOut, stderr: flsErr } = await runCommand(flsCmd);
+  // ── Step 2: Run fls — recursive, full paths, with fs-type fallback ──
+  const { stdout: flsOut, fsType: detectedFsType } = await runFlsWithFallback(fullPath, offsetFlag);
 
-  if (!flsOut && flsErr) {
-    console.warn(`[DiskAgent] fls stderr: ${flsErr}`);
+  if (!flsOut) {
+    console.warn(`[DiskAgent] fls produced no output — image may be unsupported or corrupt`);
   }
 
-  // ── Step 3: Run fsstat — volume metadata ──────────────────
-  const fsstatCmd = `"${FSSTAT_PATH}" ${offsetFlag} "${fullPath}"`.trim();
-  console.log(`[DiskAgent] fsstat: ${fsstatCmd}`);
-  const { stdout: fsstatOut } = await runCommand(fsstatCmd);
+  // ── Step 3: Run fsstat — volume metadata, with fs-type fallback ──
+  const fsstatOut = await runFsstatWithFallback(fullPath, offsetFlag);
   const volumeMeta = parseFsstat(fsstatOut);
+
+  // Surface the detected filesystem type if fsstat didn't find it
+  if (!volumeMeta.fileSystemType && detectedFsType !== "auto" && detectedFsType !== "unknown") {
+    volumeMeta.fileSystemType = detectedFsType.toUpperCase();
+  }
 
   // ── Step 4: Parse every fls line ──────────────────────────
   const lines    = flsOut.split("\n");
@@ -354,6 +423,7 @@ const analyzeDisk = async (filePath) => {
       imagePath:       fullPath,
       imageSizeBytes:  stat.size,
       partitionOffset,
+      detectedFsType,
     },
   };
 };
