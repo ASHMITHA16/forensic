@@ -108,7 +108,8 @@ const Upload = () => {
       memoryData: memoryAnalysis,
       diskData: diskAnalysis,
     });
-    setCorrelation(res.data.data);
+    // correlationAgent returns an object { patterns, riskLevel, riskScore, summary, ... }
+    setCorrelation(res.data.data?.patterns || []);
   };
   const acceptedTypes = {
   "Disk Agent": ".img,.dd,.ad1",
@@ -174,9 +175,11 @@ const Upload = () => {
         {diskAnalysis.length === 0
           ? <p className="result-empty">— no disk data found —</p>
           : diskAnalysis.map((item, index) => (
-            <div key={index} className={`forensic-card ${item.deleted ? "disk-deleted" : "disk-ok"}`}>
-              <p>{item.name}</p>
+            <div key={index} className={`forensic-card ${item.deleted ? "disk-deleted" : item.suspicious ? "mem-suspicious" : "disk-ok"}`}>
+              <p><strong>{item.type}</strong> — {item.fileName}</p>
+              <p>{item.explanation}</p>
               {item.deleted && <span className="badge-deleted">⚠ Deleted File</span>}
+              {item.suspicious && !item.deleted && <span className="badge-deleted">🚨 Suspicious</span>}
             </div>
           ))}
       </div>

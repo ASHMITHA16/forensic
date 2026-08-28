@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Vite cache
+**/.vite/
+
+# Environment files
+.env
+**/.env
+
+# Build output
+dist/
+build/
+
+# Uploads (evidence files should not be committed)
+backend/uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
