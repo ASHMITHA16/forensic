@@ -104,7 +104,7 @@ function findingLabel(item, source) {
   if (s === "log")     return item.type  || item.line || "Log event";
   if (s === "network") return item.type  || item.detail || "Network event";
   if (s === "memory")  return `${item.type || "Memory event"} — ${item.process || ""}`;
-  if (s === "disk")    return item.name  || item.file  || "Disk artifact";
+  if (s === "disk")    return item.fileName || item.name || item.file || "Disk artifact";
   return "Finding";
 }
 

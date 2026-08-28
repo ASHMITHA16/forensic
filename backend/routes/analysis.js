@@ -133,9 +133,24 @@ router.post("/analyze/disk", async (req, res) => {
       });
     }
 
-    const result = await analyzeDisk(filePath);
+    const analysis = await analyzeDisk(filePath);
 
-    res.json({ data: result });
+    const savedAnalysis = await History.create({
+      agent: "disk",
+      fileName: filePath.split(/[/\\]/).pop(),
+      findings: analysis.findings.length,
+      risk: analysis.meta.risk.toLowerCase(),
+      results: analysis.findings,
+      analysisMeta: analysis.meta,
+      evidenceHash: integrity.currentHash,
+    });
+
+    res.json({
+      message: "Disk analysis completed",
+      analysisId: savedAnalysis._id,
+      data: analysis.findings,
+      meta: analysis.meta,
+    });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

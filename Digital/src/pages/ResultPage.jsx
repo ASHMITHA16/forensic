@@ -6,12 +6,22 @@ const RESULT_CONFIG = {
   disk: {
     icon: "💾", title: "Disk Analysis Results",
     renderCard: (item, i) => (
-      <div key={i} className={`forensic-card ${item.deleted ? "disk-deleted" : "disk-ok"}`}
+      <div key={i} className={`forensic-card ${item.deleted ? "disk-deleted" : item.suspicious ? "mem-suspicious" : "disk-ok"}`}
            style={{ animationDelay: `${i * 0.05}s` }}>
-        <p><strong>{item.name || item.file || "Unknown file"}</strong></p>
-        {item.size   && <p>Size: {item.size}</p>}
-        {item.type   && <p>Type: {item.type}</p>}
-        {item.deleted && <span className="badge-deleted">⚠ Deleted File</span>}
+        <div className="log-finding-header">
+          <strong>{item.type || "Disk Artifact"}</strong>
+          <span className={`severity-chip ${item.severity || "info"}`}>{(item.severity || "info").toUpperCase()}</span>
+        </div>
+        <p className="log-explanation">{item.explanation}</p>
+        <div className="log-detail-grid">
+          <span><b>File</b>{item.fileName || "Unknown"}</span>
+          <span><b>Extension</b>{item.ext || "-"}</span>
+          <span><b>Category</b>{item.category || "-"}</span>
+          <span><b>Status</b>{item.deleted ? "Deleted" : item.suspicious ? "Suspicious" : "Present"}</span>
+        </div>
+        <p className="log-raw"><strong>Path:</strong> {item.filePath || "-"}</p>
+        {item.deleted   && <span className="badge-deleted">⚠ Deleted File</span>}
+        {item.suspicious && !item.deleted && <span className="badge-deleted">🚨 Suspicious</span>}
       </div>
     ),
   },
@@ -124,8 +134,13 @@ const ResultPage = ({ type }) => {
   const navigate = useNavigate();
   const raw = sessionStorage.getItem(`result_${type}`);
   const fileName = sessionStorage.getItem(`result_${type}_file`) || "unknown";
+<<<<<<< HEAD
   const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
   const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
+=======
+  const logMeta  = type === "log"  ? readStoredObject("result_log_meta")  : null;
+  const diskMeta = type === "disk" ? readStoredObject("result_disk_meta") : null;
+>>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
   const logAnalysisId = type === "log" ? sessionStorage.getItem("result_log_id") : null;
   const networkAnalysisId =
   type === "network"
@@ -140,6 +155,7 @@ const ResultPage = ({ type }) => {
     data = [];
   }
 
+<<<<<<< HEAD
 const networkRisk =
   networkMeta?.risk || "none";
 
@@ -151,6 +167,15 @@ const risk =
     : deriveRisk(data);
   
   const logConfidence = type === "log" ? getLogConfidence(logMeta, data) : null;
+=======
+  // Use stored risk from meta where available, fall back to derivation
+  const risk =
+    type === "log"  && logMeta?.risk  ? logMeta.risk.toLowerCase()  :
+    type === "disk" && diskMeta?.risk ? diskMeta.risk.toLowerCase() :
+    deriveRisk(data);
+
+  const logConfidence  = type === "log"  ? getLogConfidence(logMeta, data) : null;
+>>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
   const riskLabel = { high: "HIGH RISK", medium: "MEDIUM RISK", low: "LOW RISK", none: "CLEAN" }[risk];
 
   const downloadLogReport = async (format) => {
@@ -268,6 +293,7 @@ const risk =
                 <div className="meta-val">{logConfidence}%</div>
               </div>
             )}
+<<<<<<< HEAD
            {type === "network" && networkMeta && (
   <>
     <div className="meta-item">
@@ -297,6 +323,24 @@ const risk =
   </>
 )}
             
+=======
+            {type === "disk" && diskMeta && (
+              <>
+                <div className="meta-item">
+                  <div className="meta-key">Entries Scanned</div>
+                  <div className="meta-val">{diskMeta.totalEntries ?? "-"}</div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Deleted Files</div>
+                  <div className="meta-val">{diskMeta.deletedFiles ?? "-"}</div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Risk Score</div>
+                  <div className="meta-val">{diskMeta.riskScore ?? "-"} / 100</div>
+                </div>
+              </>
+            )}
+>>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
             <div className="meta-item">
               <div className="meta-key">Risk Level</div>
               <div className="meta-val">
@@ -339,6 +383,7 @@ const risk =
   <>
     <div className="section-title">🌐 Network Metrics</div>
 
+<<<<<<< HEAD
     <div className="summary-box log-metrics-box">
       <div className="log-metric-row">
         <span>
@@ -367,6 +412,29 @@ const risk =
   </>
 )}
       
+=======
+        {type === "disk" && diskMeta && (
+          <>
+            <div className="section-title">📈 Disk Analysis Metrics</div>
+            <div className="summary-box log-metrics-box">
+              <div className="log-metric-row">
+                <span>Filesystem <b>{diskMeta.volumeInfo?.fileSystemType || "Unknown"}</b></span>
+                <span>Entries scanned <b>{diskMeta.totalEntries}</b></span>
+                <span>Deleted files <b>{diskMeta.deletedFiles}</b></span>
+                <span>Suspicious files <b>{diskMeta.suspiciousFiles}</b></span>
+                <span>Risk score <b>{diskMeta.riskScore}/100</b></span>
+              </div>
+              {diskMeta.volumeInfo?.volumeName && (
+                <p>Volume: <b>{diskMeta.volumeInfo.volumeName}</b>
+                  {diskMeta.volumeInfo.lastMountTime && ` — Last mount: ${diskMeta.volumeInfo.lastMountTime}`}
+                </p>
+              )}
+              <p>{diskMeta.summary}</p>
+            </div>
+          </>
+        )}
+
+>>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
         {/* TIMELINE */}
         <div className="section-title">⏱ Analysis Timeline</div>
         <div className="timeline" style={{ marginBottom: "32px" }}>
