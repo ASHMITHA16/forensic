@@ -1,7 +1,6 @@
 import PDFDocument from "pdfkit";
 
 const safe = (value) => value === undefined || value === null ? "-" : String(value);
-
 const generateReport = (analysis, fileName = "log-evidence") => {
   if (!analysis || typeof analysis !== "object") {
     throw new Error("Log analysis is required to generate a report");

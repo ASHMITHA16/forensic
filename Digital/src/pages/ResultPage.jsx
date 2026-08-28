@@ -125,7 +125,12 @@ const ResultPage = ({ type }) => {
   const raw = sessionStorage.getItem(`result_${type}`);
   const fileName = sessionStorage.getItem(`result_${type}_file`) || "unknown";
   const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
+  const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
   const logAnalysisId = type === "log" ? sessionStorage.getItem("result_log_id") : null;
+  const networkAnalysisId =
+  type === "network"
+    ? sessionStorage.getItem("result_network_id")
+    : null;
   let data = [];
 
   try {
@@ -135,9 +140,16 @@ const ResultPage = ({ type }) => {
     data = [];
   }
 
-  const risk = type === "log" && logMeta?.risk
+const networkRisk =
+  networkMeta?.risk || "none";
+
+const risk =
+  type === "log" && logMeta?.risk
     ? logMeta.risk.toLowerCase()
+    : type === "network"
+    ? networkRisk
     : deriveRisk(data);
+  
   const logConfidence = type === "log" ? getLogConfidence(logMeta, data) : null;
   const riskLabel = { high: "HIGH RISK", medium: "MEDIUM RISK", low: "LOW RISK", none: "CLEAN" }[risk];
 
@@ -160,6 +172,56 @@ const ResultPage = ({ type }) => {
       alert(`${format.toUpperCase()} report generation failed.`);
     }
   };
+
+  const downloadNetworkReport = async (format) => {
+  try {
+
+    const response = await axios.get(
+      `http://localhost:5000/api/analyze/network/report/${networkAnalysisId}?format=${format}`,
+      {
+        responseType: format === "json" ? "json" : "blob"
+      }
+    );
+
+    const content =
+      format === "json"
+        ? JSON.stringify(response.data, null, 2)
+        : response.data;
+
+    const blob = new Blob(
+      [content],
+      {
+        type:
+          format === "pdf"
+            ? "application/pdf"
+            : format === "markdown"
+            ? "text/markdown"
+            : "application/json"
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      `${fileName.replace(/[^a-z0-9._-]/gi, "_")}-network-report.${
+        format === "markdown" ? "md" : format
+      }`;
+
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(`${format.toUpperCase()} report generation failed.`);
+  }
+};
 
   return (
     <>
@@ -206,6 +268,35 @@ const ResultPage = ({ type }) => {
                 <div className="meta-val">{logConfidence}%</div>
               </div>
             )}
+           {type === "network" && networkMeta && (
+  <>
+    <div className="meta-item">
+      <div className="meta-key">Network Traffic</div>
+      <div className="meta-val">{networkMeta.totalPackets} packets</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">External Connections</div>
+      <div className="meta-val">{networkMeta.externalConnections}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Malicious IPs</div>
+      <div className="meta-val">{networkMeta.maliciousIPs}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Port Scans</div>
+      <div className="meta-val">{networkMeta.portScans}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Beaconing</div>
+      <div className="meta-val">{networkMeta.beaconingActivities}</div>
+    </div>
+  </>
+)}
+            
             <div className="meta-item">
               <div className="meta-key">Risk Level</div>
               <div className="meta-val">
@@ -244,7 +335,38 @@ const ResultPage = ({ type }) => {
             </div>
           </>
         )}
+      {type === "network" && networkMeta && (
+  <>
+    <div className="section-title">🌐 Network Metrics</div>
 
+    <div className="summary-box log-metrics-box">
+      <div className="log-metric-row">
+        <span>
+          Packets <b>{networkMeta.totalPackets}</b>
+        </span>
+
+        <span>
+          External <b>{networkMeta.externalConnections}</b>
+        </span>
+
+        <span>
+          Malicious <b>{networkMeta.maliciousIPs}</b>
+        </span>
+
+        <span>
+          Port Scans <b>{networkMeta.portScans}</b>
+        </span>
+
+        <span>
+          Beaconing <b>{networkMeta.beaconingActivities}</b>
+        </span>
+      </div>
+
+      <p>{networkMeta.summary}</p>
+    </div>
+  </>
+)}
+      
         {/* TIMELINE */}
         <div className="section-title">⏱ Analysis Timeline</div>
         <div className="timeline" style={{ marginBottom: "32px" }}>
@@ -261,11 +383,55 @@ const ResultPage = ({ type }) => {
         <div className="btn-group">
           <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← Dashboard</button>
           <button className="btn btn-ghost" onClick={() => navigate("/history")}>View History</button>
-          {type === "log" && <>
-            <button className="btn btn-success" onClick={() => downloadLogReport("json")}>JSON Report</button>
-            <button className="btn btn-ghost" onClick={() => downloadLogReport("markdown")}>Markdown Report</button>
-            <button className="btn btn-danger" onClick={() => downloadLogReport("pdf")}>PDF Report</button>
-          </>}
+          {type === "log" && (
+  <>
+    <button
+      className="btn btn-success"
+      onClick={() => downloadLogReport("json")}
+    >
+      JSON Report
+    </button>
+
+    <button
+      className="btn btn-ghost"
+      onClick={() => downloadLogReport("markdown")}
+    >
+      Markdown Report
+    </button>
+
+    <button
+      className="btn btn-danger"
+      onClick={() => downloadLogReport("pdf")}
+    >
+      PDF Report
+    </button>
+  </>
+)}
+
+{type === "network" && (
+  <>
+    <button
+      className="btn btn-success"
+      onClick={() => downloadNetworkReport("json")}
+    >
+      JSON Report
+    </button>
+
+    <button
+      className="btn btn-ghost"
+      onClick={() => downloadNetworkReport("markdown")}
+    >
+      Markdown Report
+    </button>
+
+    <button
+      className="btn btn-danger"
+      onClick={() => downloadNetworkReport("pdf")}
+    >
+      PDF Report
+    </button>
+  </>
+)}
           <button className="btn btn-primary" onClick={() => navigate(`/agent/${type}`)}>Run New Scan</button>
         </div>
       </div>

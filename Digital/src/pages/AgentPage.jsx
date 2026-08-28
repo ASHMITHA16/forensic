@@ -51,6 +51,7 @@ const AgentPage = ({ type }) => {
     network: ".pcap,.pcapng",
   };
 
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
 
@@ -98,52 +99,82 @@ const AgentPage = ({ type }) => {
   };
 
   const handleAnalyze = async () => {
-    if (!uploadedPath) {
-      alert("Upload a file first!");
-      return;
-    }
+  if (!uploadedPath) {
+    alert("Upload a file first!");
+    return;
+  }
 
-    setLoading(true);
-    setPhase("analyzing");
+  setLoading(true);
+  setPhase("analyzing");
 
-    if (type === "log") {
-      sessionStorage.removeItem("result_log_meta");
-      sessionStorage.removeItem("result_log_id");
-    }
+  if (type === "log") {
+    sessionStorage.removeItem("result_log_meta");
+    sessionStorage.removeItem("result_log_id");
+  }
 
-    try {
-      const res = await axios.post(
-        `http://localhost:5000${config.endpoint}`,
-        {
-          filePath: uploadedPath,
-        }
-      );
+  if (type === "network") {
+    sessionStorage.removeItem("result_network_id");
+  }
 
-      sessionStorage.setItem(
-        `result_${type}`,
-        JSON.stringify(res.data.data)
-      );
-
-      sessionStorage.setItem(
-        `result_${type}_file`,
-        file?.name || "unknown"
-      );
-
-      if (type === "log" && res.data.meta) {
-        sessionStorage.setItem("result_log_meta", JSON.stringify(res.data.meta));
-        if (res.data.analysisId) {
-          sessionStorage.setItem("result_log_id", String(res.data.analysisId));
-        }
+  try {
+    const res = await axios.post(
+      `http://localhost:5000${config.endpoint}`,
+      {
+        filePath: uploadedPath,
       }
+    );
 
-      navigate(config.result);
-    } catch (err) {
-      console.error(err);
-      alert("Analysis failed ❌");
-    } finally {
-      setLoading(false);
+    sessionStorage.setItem(
+      `result_${type}`,
+      JSON.stringify(res.data.data)
+    );
+
+    sessionStorage.setItem(
+      `result_${type}_file`,
+      file?.name || "unknown"
+    );
+
+    // Log Agent
+    if (type === "log" && res.data.meta) {
+      sessionStorage.setItem(
+        "result_log_meta",
+        JSON.stringify(res.data.meta)
+      );
+
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_log_id",
+          String(res.data.analysisId)
+        );
+      }
     }
-  };
+
+    // Network Agent
+    if (type === "network") {
+
+  sessionStorage.setItem(
+    "result_network_meta",
+    JSON.stringify(res.data.meta)
+  );
+
+  if (res.data.analysisId) {
+    sessionStorage.setItem(
+      "result_network_id",
+      String(res.data.analysisId)
+    );
+  }
+}
+    navigate(config.result);
+
+  } catch (err) {
+    console.error(err);
+    alert("Analysis failed ❌");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <>

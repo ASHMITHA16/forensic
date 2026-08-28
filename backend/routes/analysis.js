@@ -8,6 +8,7 @@ import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
 import History from "../models/History.js";
 import generateReport, { generatePdf } from "../agents/reportAgent.js";
+import generateNReport from "../agents/report.js";
 
 const router = express.Router();
 // 🔐 Integrity Check Function
@@ -141,6 +142,87 @@ router.post("/analyze/disk", async (req, res) => {
   }
 });
 
+router.post("/analyze/network/report", async (req, res) => {
+  try {
+   const report = generateNReport(
+  {
+    findings: savedAnalysis.results,
+    meta: {
+      risk: savedAnalysis.risk,
+      agent: "network"
+    }
+  },
+  savedAnalysis.fileName
+);
+    const format = req.query.format || "json";
+
+    if (format === "markdown") {
+      return res.type("text/markdown").send(report.markdown);
+    }
+
+    if (format === "pdf") {
+      const pdf = await generatePdf(report);
+      return res.type("application/pdf").send(pdf);
+    }
+
+    return res.json(report.json);
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/analyze/network/report/:analysisId", async (req, res) => {
+
+  try {
+
+    const savedAnalysis =
+      await History.findOne({
+        _id: req.params.analysisId,
+        agent: "network"
+      });
+
+    if (!savedAnalysis) {
+      return res.status(404).json({
+        error: "Network analysis not found"
+      });
+    }
+
+   const report = generateNReport(
+  {
+    findings: savedAnalysis.results,
+    meta: {
+      risk: savedAnalysis.risk,
+      agent: "network"
+    }
+  },
+  savedAnalysis.fileName
+);
+
+    const format = req.query.format || "json";
+
+    if (format === "markdown") {
+      return res.type("text/markdown").send(report.markdown);
+    }
+
+    if (format === "pdf") {
+      return res
+        .type("application/pdf")
+        .send(await generatePdf(report));
+    }
+
+    return res.json(report.json);
+
+  } catch (err) {
+
+    return res.status(400).json({
+      error: err.message
+    });
+
+  }
+
+});
+
 router.post("/analyze/network", async (req, res) => {
   try {
     const { filePath } = req.body;
@@ -154,27 +236,65 @@ router.post("/analyze/network", async (req, res) => {
     }
 
      const result = await analyzeNetwork(filePath);
+     const hasMaliciousIP = result.some(
+  r => r.type === "Known Malicious IP"
+);
 
-    const risk =
-      result.length > 15
-        ? "high"
-        : result.length > 5
-        ? "medium"
-        : "low";
-  
-    await History.create({
-      agent: "network",
-      fileName: filePath.split(/[/\\]/).pop(),
-      findings: result.length,
-      risk,
-      results: result
-    });
+const hasPortScan = result.some(
+  r => r.type === "Potential Port Scan"
+);
 
-    res.json({
-      message: "Analysis completed",
-      data: result
-    });
+const hasBeaconing = result.some(
+  r => r.type === "Beaconing Activity"
+);
 
+let risk = "low";
+
+if (hasMaliciousIP) {
+  risk = "high";
+}
+else if (hasPortScan || hasBeaconing) {
+  risk = "medium";
+}
+else if (result.length > 20) {
+  risk = "medium";
+}
+console.log(`Network analysis risk level: ${risk}`);
+    const savedAnalysis = await History.create({
+  agent: "network",
+  fileName: filePath.split(/[\/\\]/).pop(), 
+  findings: result.length,
+  risk,
+  results: result
+});
+
+   res.json({
+  message: "Analysis completed",
+  analysisId: savedAnalysis._id,
+  data: result,
+  meta: {
+    totalPackets: result.length,
+
+    maliciousIPs: result.filter(
+      r => r.type === "Known Malicious IP"
+    ).length,
+
+    portScans: result.filter(
+      r => r.type === "Potential Port Scan"
+    ).length,
+
+    beaconingActivities: result.filter(
+      r => r.type === "Beaconing Activity"
+    ).length,
+
+    externalConnections: result.filter(
+      r => r.type === "External Connection"
+    ).length,
+
+    risk,
+    summary: `Detected ${result.length} network findings`
+  }
+});
 
   } catch (err) {
     res.status(500).json({ error: err.message });

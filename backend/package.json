@@ -1,6 +1,6 @@
 {
   "scripts": {
-     "test": "node --test",
+    "test": "node --test",
     "log-agent-test": "node --test agents/logAgent.test.js"
   },
   "dependencies": {
