@@ -107,23 +107,19 @@ const AgentPage = ({ type }) => {
   setLoading(true);
   setPhase("analyzing");
 
-<<<<<<< HEAD
+  // Clear old data
   if (type === "log") {
     sessionStorage.removeItem("result_log_meta");
     sessionStorage.removeItem("result_log_id");
   }
-=======
-    if (type === "log") {
-      sessionStorage.removeItem("result_log_meta");
-      sessionStorage.removeItem("result_log_id");
-    }
-    if (type === "disk") {
-      sessionStorage.removeItem("result_disk_meta");
-      sessionStorage.removeItem("result_disk_id");
-    }
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
+
+  if (type === "disk") {
+    sessionStorage.removeItem("result_disk_meta");
+    sessionStorage.removeItem("result_disk_id");
+  }
 
   if (type === "network") {
+    sessionStorage.removeItem("result_network_meta");
     sessionStorage.removeItem("result_network_id");
   }
 
@@ -135,7 +131,7 @@ const AgentPage = ({ type }) => {
       }
     );
 
-<<<<<<< HEAD
+    // Store findings
     sessionStorage.setItem(
       `result_${type}`,
       JSON.stringify(res.data.data)
@@ -159,40 +155,39 @@ const AgentPage = ({ type }) => {
           String(res.data.analysisId)
         );
       }
-=======
-      if (type === "disk" && res.data.meta) {
-        sessionStorage.setItem("result_disk_meta", JSON.stringify(res.data.meta));
-        if (res.data.analysisId) {
-          sessionStorage.setItem("result_disk_id", String(res.data.analysisId));
-        }
-      }
+    }
 
-      navigate(config.result);
-    } catch (err) {
-      console.error(err);
-      alert("Analysis failed ❌");
-    } finally {
-      setLoading(false);
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
+    // Disk Agent
+    if (type === "disk" && res.data.meta) {
+      sessionStorage.setItem(
+        "result_disk_meta",
+        JSON.stringify(res.data.meta)
+      );
+
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_disk_id",
+          String(res.data.analysisId)
+        );
+      }
     }
 
     // Network Agent
-    if (type === "network") {
+    if (type === "network" && res.data.meta) {
+      sessionStorage.setItem(
+        "result_network_meta",
+        JSON.stringify(res.data.meta)
+      );
 
-  sessionStorage.setItem(
-    "result_network_meta",
-    JSON.stringify(res.data.meta)
-  );
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_network_id",
+          String(res.data.analysisId)
+        );
+      }
+    }
 
-  if (res.data.analysisId) {
-    sessionStorage.setItem(
-      "result_network_id",
-      String(res.data.analysisId)
-    );
-  }
-}
     navigate(config.result);
-
   } catch (err) {
     console.error(err);
     alert("Analysis failed ❌");
@@ -200,7 +195,6 @@ const AgentPage = ({ type }) => {
     setLoading(false);
   }
 };
-
 
 
   return (

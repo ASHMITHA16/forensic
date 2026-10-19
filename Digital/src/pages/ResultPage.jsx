@@ -134,48 +134,43 @@ const ResultPage = ({ type }) => {
   const navigate = useNavigate();
   const raw = sessionStorage.getItem(`result_${type}`);
   const fileName = sessionStorage.getItem(`result_${type}_file`) || "unknown";
-<<<<<<< HEAD
-  const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
-  const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
-=======
-  const logMeta  = type === "log"  ? readStoredObject("result_log_meta")  : null;
-  const diskMeta = type === "disk" ? readStoredObject("result_disk_meta") : null;
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
-  const logAnalysisId = type === "log" ? sessionStorage.getItem("result_log_id") : null;
-  const networkAnalysisId =
+ const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
+const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
+const diskMeta = type === "disk" ? readStoredObject("result_disk_meta") : null;
+
+const logAnalysisId =
+  type === "log"
+    ? sessionStorage.getItem("result_log_id")
+    : null;
+
+const networkAnalysisId =
   type === "network"
     ? sessionStorage.getItem("result_network_id")
     : null;
-  let data = [];
 
-  try {
-    const parsed = raw ? JSON.parse(raw) : [];
-    data = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    data = [];
-  }
+let data = [];
 
-<<<<<<< HEAD
-const networkRisk =
-  networkMeta?.risk || "none";
+try {
+  const parsed = raw ? JSON.parse(raw) : [];
+  data = Array.isArray(parsed) ? parsed : [];
+} catch {
+  data = [];
+}
+
+const networkRisk = networkMeta?.risk || "none";
 
 const risk =
   type === "log" && logMeta?.risk
     ? logMeta.risk.toLowerCase()
     : type === "network"
-    ? networkRisk
+    ? networkRisk.toLowerCase()
     : deriveRisk(data);
-  
-  const logConfidence = type === "log" ? getLogConfidence(logMeta, data) : null;
-=======
-  // Use stored risk from meta where available, fall back to derivation
-  const risk =
-    type === "log"  && logMeta?.risk  ? logMeta.risk.toLowerCase()  :
-    type === "disk" && diskMeta?.risk ? diskMeta.risk.toLowerCase() :
-    deriveRisk(data);
 
-  const logConfidence  = type === "log"  ? getLogConfidence(logMeta, data) : null;
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
+const logConfidence =
+  type === "log"
+    ? getLogConfidence(logMeta, data)
+    : null;
+
   const riskLabel = { high: "HIGH RISK", medium: "MEDIUM RISK", low: "LOW RISK", none: "CLEAN" }[risk];
 
   const downloadLogReport = async (format) => {
@@ -293,8 +288,7 @@ const risk =
                 <div className="meta-val">{logConfidence}%</div>
               </div>
             )}
-<<<<<<< HEAD
-           {type === "network" && networkMeta && (
+{type === "network" && networkMeta && (
   <>
     <div className="meta-item">
       <div className="meta-key">Network Traffic</div>
@@ -322,8 +316,6 @@ const risk =
     </div>
   </>
 )}
-            
-=======
             {type === "disk" && diskMeta && (
               <>
                 <div className="meta-item">
@@ -340,7 +332,6 @@ const risk =
                 </div>
               </>
             )}
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
             <div className="meta-item">
               <div className="meta-key">Risk Level</div>
               <div className="meta-val">
@@ -382,37 +373,37 @@ const risk =
       {type === "network" && networkMeta && (
   <>
     <div className="section-title">🌐 Network Metrics</div>
+<div className="summary-box log-metrics-box">
+  <div className="log-metric-row">
+    <span>
+      Packets <b>{networkMeta.totalPackets}</b>
+    </span>
 
-<<<<<<< HEAD
-    <div className="summary-box log-metrics-box">
-      <div className="log-metric-row">
-        <span>
-          Packets <b>{networkMeta.totalPackets}</b>
-        </span>
+    <span>
+      External <b>{networkMeta.externalConnections}</b>
+    </span>
 
-        <span>
-          External <b>{networkMeta.externalConnections}</b>
-        </span>
+    <span>
+      Malicious <b>{networkMeta.maliciousIPs}</b>
+    </span>
 
-        <span>
-          Malicious <b>{networkMeta.maliciousIPs}</b>
-        </span>
+    <span>
+      Port Scans <b>{networkMeta.portScans}</b>
+    </span>
 
-        <span>
-          Port Scans <b>{networkMeta.portScans}</b>
-        </span>
+    <span>
+      Beaconing <b>{networkMeta.beaconingActivities}</b>
+    </span>
+  </div>
 
-        <span>
-          Beaconing <b>{networkMeta.beaconingActivities}</b>
-        </span>
-      </div>
-
-      <p>{networkMeta.summary}</p>
-    </div>
-  </>
+<p>{networkMeta.summary}</p>
+</div>
+</>
 )}
-      
-=======
+
+
+
+
         {type === "disk" && diskMeta && (
           <>
             <div className="section-title">📈 Disk Analysis Metrics</div>
@@ -434,7 +425,7 @@ const risk =
           </>
         )}
 
->>>>>>> 2714830e3df5e461bc184892202e61d758f6f4f6
+
         {/* TIMELINE */}
         <div className="section-title">⏱ Analysis Timeline</div>
         <div className="timeline" style={{ marginBottom: "32px" }}>
@@ -503,6 +494,7 @@ const risk =
           <button className="btn btn-primary" onClick={() => navigate(`/agent/${type}`)}>Run New Scan</button>
         </div>
       </div>
+    
     </>
   );
 };
