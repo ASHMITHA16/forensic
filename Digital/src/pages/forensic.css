@@ -652,6 +652,59 @@ body {
 .forensic-card.correlation strong { font-family: var(--mono); color: var(--danger); font-size: 0.82rem; letter-spacing: 0.04em; }
 .forensic-card.correlation:hover { border-color: var(--danger); box-shadow: 0 6px 24px var(--danger-glow); }
 
+.log-agent-guide {
+  margin: 24px 0 28px;
+  padding: 18px 20px;
+  border: 1px solid rgba(56,189,248,0.18);
+  background: rgba(56,189,248,0.045);
+  border-radius: var(--radius);
+}
+
+.log-agent-guide .section-title { margin-bottom: 8px; }
+.log-agent-guide p { color: var(--text-secondary); margin-bottom: 14px; }
+.log-coverage-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.log-coverage-list span {
+  padding: 4px 9px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+}
+
+.log-finding { border-left: 3px solid var(--accent); }
+.log-finding.log-critical { border-left-color: var(--danger); }
+.log-finding.log-high { border-left-color: var(--danger); }
+.log-finding.log-medium { border-left-color: var(--warn); }
+.log-finding.log-low { border-left-color: var(--success); }
+.log-finding-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.log-finding-header strong { color: var(--accent); font-family: var(--mono); }
+.severity-chip {
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+}
+.severity-chip.critical, .severity-chip.high { color: var(--danger); }
+.severity-chip.medium { color: var(--warn); }
+.severity-chip.low { color: var(--success); }
+.severity-chip.info { color: var(--accent); }
+.log-explanation { color: var(--text-primary) !important; margin-top: 8px !important; }
+.log-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.log-detail-grid span { color: var(--text-secondary); font-family: var(--mono); font-size: 0.72rem; overflow-wrap: anywhere; }
+.log-detail-grid b { display: block; color: var(--text-muted); font-size: 0.62rem; font-weight: 400; margin-bottom: 2px; text-transform: uppercase; }
+.log-raw { border-top: 1px solid var(--border); margin-top: 14px !important; padding-top: 10px; overflow-wrap: anywhere; }
+.log-metrics-box p { color: var(--text-secondary); margin-top: 14px; }
+.log-metric-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.log-metric-row span { color: var(--text-muted); font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; }
+.log-metric-row b { display: block; color: var(--text-primary); font-size: 0.9rem; margin-top: 3px; text-transform: none; }
+
+@media (max-width: 700px) {
+  .log-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .log-metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .badge-deleted {
   display: inline-block;
   margin-top: 6px;

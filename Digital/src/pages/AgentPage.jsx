@@ -16,6 +16,8 @@ const AGENT_CONFIG = {
     endpoint: "/api/analyze/log",
     result: "/result/log",
     color: "#38bdf8",
+    description: "Normalize system events, identify attack indicators, and prepare evidence for cross-agent correlation.",
+    coverage: ["Authentication failures", "Unauthorized access", "Privilege escalation", "Suspicious commands", "Malware indicators", "IPv4 indicators"],
   },
   memory: {
     icon: "🧠",
@@ -43,11 +45,12 @@ const AgentPage = ({ type }) => {
   const [phase, setPhase] = useState("idle");
 
   const acceptedTypes = {
-    disk: ".img,.dd,.ad1",
+    disk: ".img,.dd,.ad1,.raw",
     log: ".txt,.log",
     memory: ".raw,.mem",
     network: ".pcap,.pcapng",
   };
+
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -96,40 +99,103 @@ const AgentPage = ({ type }) => {
   };
 
   const handleAnalyze = async () => {
-    if (!uploadedPath) {
-      alert("Upload a file first!");
-      return;
+  if (!uploadedPath) {
+    alert("Upload a file first!");
+    return;
+  }
+
+  setLoading(true);
+  setPhase("analyzing");
+
+  // Clear old data
+  if (type === "log") {
+    sessionStorage.removeItem("result_log_meta");
+    sessionStorage.removeItem("result_log_id");
+  }
+
+  if (type === "disk") {
+    sessionStorage.removeItem("result_disk_meta");
+    sessionStorage.removeItem("result_disk_id");
+  }
+
+  if (type === "network") {
+    sessionStorage.removeItem("result_network_meta");
+    sessionStorage.removeItem("result_network_id");
+  }
+
+  try {
+    const res = await axios.post(
+      `http://localhost:5000${config.endpoint}`,
+      {
+        filePath: uploadedPath,
+      }
+    );
+
+    // Store findings
+    sessionStorage.setItem(
+      `result_${type}`,
+      JSON.stringify(res.data.data)
+    );
+
+    sessionStorage.setItem(
+      `result_${type}_file`,
+      file?.name || "unknown"
+    );
+
+    // Log Agent
+    if (type === "log" && res.data.meta) {
+      sessionStorage.setItem(
+        "result_log_meta",
+        JSON.stringify(res.data.meta)
+      );
+
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_log_id",
+          String(res.data.analysisId)
+        );
+      }
     }
 
-    setLoading(true);
-    setPhase("analyzing");
-
-    try {
-      const res = await axios.post(
-        `http://localhost:5000${config.endpoint}`,
-        {
-          filePath: uploadedPath,
-        }
-      );
-
+    // Disk Agent
+    if (type === "disk" && res.data.meta) {
       sessionStorage.setItem(
-        `result_${type}`,
-        JSON.stringify(res.data.data)
+        "result_disk_meta",
+        JSON.stringify(res.data.meta)
       );
 
-      sessionStorage.setItem(
-        `result_${type}_file`,
-        file?.name || "unknown"
-      );
-
-      navigate(config.result);
-    } catch (err) {
-      console.error(err);
-      alert("Analysis failed ❌");
-    } finally {
-      setLoading(false);
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_disk_id",
+          String(res.data.analysisId)
+        );
+      }
     }
-  };
+
+    // Network Agent
+    if (type === "network" && res.data.meta) {
+      sessionStorage.setItem(
+        "result_network_meta",
+        JSON.stringify(res.data.meta)
+      );
+
+      if (res.data.analysisId) {
+        sessionStorage.setItem(
+          "result_network_id",
+          String(res.data.analysisId)
+        );
+      }
+    }
+
+    navigate(config.result);
+  } catch (err) {
+    console.error(err);
+    alert("Analysis failed ❌");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <>
@@ -222,6 +288,16 @@ const AgentPage = ({ type }) => {
             </div>
           )}
         </div>
+
+        {type === "log" && (
+          <div className="log-agent-guide">
+            <div className="section-title">📡 Detection coverage</div>
+            <p>{config.description}</p>
+            <div className="log-coverage-list">
+              {config.coverage.map((item) => <span key={item}>{item}</span>)}
+            </div>
+          </div>
+        )}
 
         <div className="section-title">
           ℹ About This Agent

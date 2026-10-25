@@ -1,26 +1,46 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const RESULT_CONFIG = {
   disk: {
     icon: "💾", title: "Disk Analysis Results",
     renderCard: (item, i) => (
-      <div key={i} className={`forensic-card ${item.deleted ? "disk-deleted" : "disk-ok"}`}
+      <div key={i} className={`forensic-card ${item.deleted ? "disk-deleted" : item.suspicious ? "mem-suspicious" : "disk-ok"}`}
            style={{ animationDelay: `${i * 0.05}s` }}>
-        <p><strong>{item.name || item.file || "Unknown file"}</strong></p>
-        {item.size   && <p>Size: {item.size}</p>}
-        {item.type   && <p>Type: {item.type}</p>}
-        {item.deleted && <span className="badge-deleted">⚠ Deleted File</span>}
+        <div className="log-finding-header">
+          <strong>{item.type || "Disk Artifact"}</strong>
+          <span className={`severity-chip ${item.severity || "info"}`}>{(item.severity || "info").toUpperCase()}</span>
+        </div>
+        <p className="log-explanation">{item.explanation}</p>
+        <div className="log-detail-grid">
+          <span><b>File</b>{item.fileName || "Unknown"}</span>
+          <span><b>Extension</b>{item.ext || "-"}</span>
+          <span><b>Category</b>{item.category || "-"}</span>
+          <span><b>Status</b>{item.deleted ? "Deleted" : item.suspicious ? "Suspicious" : "Present"}</span>
+        </div>
+        <p className="log-raw"><strong>Path:</strong> {item.filePath || "-"}</p>
+        {item.deleted   && <span className="badge-deleted">⚠ Deleted File</span>}
+        {item.suspicious && !item.deleted && <span className="badge-deleted">🚨 Suspicious</span>}
       </div>
     ),
   },
   log: {
     icon: "📊", title: "Log Analysis Results",
     renderCard: (item, i) => (
-      <div key={i} className="forensic-card" style={{ animationDelay: `${i * 0.05}s` }}>
-        <p><strong>Type:</strong> {item.type}</p>
-        <p><strong>IP:</strong> {item.ip}</p>
-        <p><strong>Details:</strong> {item.line}</p>
+      <div key={i} className={`forensic-card log-finding log-${item.severity || "info"}`} style={{ animationDelay: `${i * 0.05}s` }}>
+        <div className="log-finding-header">
+          <strong>{item.type}</strong>
+          <span className={`severity-chip ${item.severity || "info"}`}>{(item.severity || "info").toUpperCase()}</span>
+        </div>
+        <p className="log-explanation">{item.explanation}</p>
+        <div className="log-detail-grid">
+          <span><b>Category</b>{item.category || "Event"}</span>
+          <span><b>Line</b>{item.lineNumber || "-"}</span>
+          <span><b>IP</b>{item.ip || "None"}</span>
+          <span><b>User</b>{item.user || "Unknown"}</span>
+        </div>
+        <p className="log-raw"><strong>Raw event:</strong> {item.line}</p>
       </div>
     ),
   },
@@ -55,10 +75,20 @@ const DUMMY_TIMELINE = [
   { time: "00:00:14", event: <><strong>Report generated</strong> — ready for review</> },
 ];
 
+function readStoredObject(key) {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
 function deriveRisk(data) {
   if (!data || data.length === 0) return "none";
   const hasCritical = data.some(d =>
     d.deleted || d.type === "Suspicious Process" ||
+    d.severity === "critical" || d.severity === "high" ||
     (d.type && d.type.toLowerCase().includes("brute")) ||
     (d.type && d.type.toLowerCase().includes("malware"))
   );
@@ -67,21 +97,151 @@ function deriveRisk(data) {
   return "low";
 }
 
+function getLogConfidence(meta, data) {
+  if (Number.isFinite(meta?.confidence) && meta.confidence > 0) return meta.confidence;
+  if (!meta?.totalLines && data.length === 0) return 0;
+
+  if (meta?.confidenceBasis) {
+    const basis = meta.confidenceBasis;
+    return Math.round(
+      (basis.format || 0) * 0.35 +
+      (basis.parseCoverage || 0) * 0.25 +
+      (basis.timestampQuality || 0) * 0.15 +
+      (basis.structureQuality || 0) * 0.15 +
+      (basis.consistency || 0) * 0.10
+    );
+  }
+
+  const formatScore = {
+    "JSON Lines": 95,
+    "Windows Event Log": 90,
+    "Syslog / Unix": 90,
+    "Mixed Log": 82,
+    "Plain Text Log": 75,
+  }[meta?.format] || 60;
+  const timestampScore = data.length === 0
+    ? 80
+    : Math.round((data.filter((item) => item.timestamp).length / data.length) * 100);
+  const structureScore = data.length === 0
+    ? 80
+    : Math.round((data.filter((item) => item.ip || item.user || item.host || item.process || item.eventId).length / data.length) * 100);
+
+  return Math.round(formatScore * 0.35 + 100 * 0.25 + timestampScore * 0.15 + structureScore * 0.15 + 100 * 0.10);
+}
+
 const ResultPage = ({ type }) => {
   const config = RESULT_CONFIG[type];
   const navigate = useNavigate();
-  const [data, setData] = useState([]);
-  const [fileName, setFileName] = useState("unknown");
+  const raw = sessionStorage.getItem(`result_${type}`);
+  const fileName = sessionStorage.getItem(`result_${type}_file`) || "unknown";
+ const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
+const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
+const diskMeta = type === "disk" ? readStoredObject("result_disk_meta") : null;
 
-  useEffect(() => {
-    const raw = sessionStorage.getItem(`result_${type}`);
-    const name = sessionStorage.getItem(`result_${type}_file`);
-    if (raw) setData(JSON.parse(raw));
-    if (name) setFileName(name);
-  }, [type]);
+const logAnalysisId =
+  type === "log"
+    ? sessionStorage.getItem("result_log_id")
+    : null;
 
-  const risk = deriveRisk(data);
+const networkAnalysisId =
+  type === "network"
+    ? sessionStorage.getItem("result_network_id")
+    : null;
+
+let data = [];
+
+try {
+  const parsed = raw ? JSON.parse(raw) : [];
+  data = Array.isArray(parsed) ? parsed : [];
+} catch {
+  data = [];
+}
+
+const networkRisk = networkMeta?.risk || "none";
+
+const risk =
+  type === "log" && logMeta?.risk
+    ? logMeta.risk.toLowerCase()
+    : type === "network"
+    ? networkRisk.toLowerCase()
+    : deriveRisk(data);
+
+const logConfidence =
+  type === "log"
+    ? getLogConfidence(logMeta, data)
+    : null;
+
   const riskLabel = { high: "HIGH RISK", medium: "MEDIUM RISK", low: "LOW RISK", none: "CLEAN" }[risk];
+
+  const downloadLogReport = async (format) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/analyze/log/report/${logAnalysisId}?format=${format}`,
+        { responseType: format === "json" ? "json" : "blob" }
+      );
+      const content = format === "json" ? JSON.stringify(response.data, null, 2) : response.data;
+      const blob = new Blob([content], { type: format === "pdf" ? "application/pdf" : format === "markdown" ? "text/markdown" : "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${fileName.replace(/[^a-z0-9._-]/gi, "_")}-forensic-report.${format === "markdown" ? "md" : format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert(`${format.toUpperCase()} report generation failed.`);
+    }
+  };
+
+  const downloadNetworkReport = async (format) => {
+  try {
+
+    const response = await axios.get(
+      `http://localhost:5000/api/analyze/network/report/${networkAnalysisId}?format=${format}`,
+      {
+        responseType: format === "json" ? "json" : "blob"
+      }
+    );
+
+    const content =
+      format === "json"
+        ? JSON.stringify(response.data, null, 2)
+        : response.data;
+
+    const blob = new Blob(
+      [content],
+      {
+        type:
+          format === "pdf"
+            ? "application/pdf"
+            : format === "markdown"
+            ? "text/markdown"
+            : "application/json"
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      `${fileName.replace(/[^a-z0-9._-]/gi, "_")}-network-report.${
+        format === "markdown" ? "md" : format
+      }`;
+
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(`${format.toUpperCase()} report generation failed.`);
+  }
+};
 
   return (
     <>
@@ -116,6 +276,62 @@ const ResultPage = ({ type }) => {
               <div className="meta-key">Total Findings</div>
               <div className="meta-val">{data.length}</div>
             </div>
+            {type === "log" && (
+              <div className="meta-item">
+                <div className="meta-key">Unique Indicators</div>
+                <div className="meta-val">{logMeta?.uniqueIndicators?.length ?? new Set(data.flatMap((item) => item.indicators || [])).size}</div>
+              </div>
+            )}
+            {type === "log" && logMeta && (
+              <div className="meta-item">
+                <div className="meta-key">Confidence</div>
+                <div className="meta-val">{logConfidence}%</div>
+              </div>
+            )}
+{type === "network" && networkMeta && (
+  <>
+    <div className="meta-item">
+      <div className="meta-key">Network Traffic</div>
+      <div className="meta-val">{networkMeta.totalPackets} packets</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">External Connections</div>
+      <div className="meta-val">{networkMeta.externalConnections}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Malicious IPs</div>
+      <div className="meta-val">{networkMeta.maliciousIPs}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Port Scans</div>
+      <div className="meta-val">{networkMeta.portScans}</div>
+    </div>
+
+    <div className="meta-item">
+      <div className="meta-key">Beaconing</div>
+      <div className="meta-val">{networkMeta.beaconingActivities}</div>
+    </div>
+  </>
+)}
+            {type === "disk" && diskMeta && (
+              <>
+                <div className="meta-item">
+                  <div className="meta-key">Entries Scanned</div>
+                  <div className="meta-val">{diskMeta.totalEntries ?? "-"}</div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Deleted Files</div>
+                  <div className="meta-val">{diskMeta.deletedFiles ?? "-"}</div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Risk Score</div>
+                  <div className="meta-val">{diskMeta.riskScore ?? "-"} / 100</div>
+                </div>
+              </>
+            )}
             <div className="meta-item">
               <div className="meta-key">Risk Level</div>
               <div className="meta-val">
@@ -140,13 +356,85 @@ const ResultPage = ({ type }) => {
           }
         </div>
 
+        {type === "log" && logMeta && (
+          <>
+            <div className="section-title">📈 Detection Metrics</div>
+            <div className="summary-box log-metrics-box">
+              <div className="log-metric-row">
+                <span>Format <b>{logMeta.format}</b></span>
+                <span>Lines inspected <b>{logMeta.totalLines}</b></span>
+                <span>Risk score <b>{logMeta.riskScore}/100</b></span>
+                <span>Users <b>{logMeta.uniqueUsers?.length || 0}</b></span>
+              </div>
+              <p>{logMeta.summary}</p>
+            </div>
+          </>
+        )}
+      {type === "network" && networkMeta && (
+  <>
+    <div className="section-title">🌐 Network Metrics</div>
+<div className="summary-box log-metrics-box">
+  <div className="log-metric-row">
+    <span>
+      Packets <b>{networkMeta.totalPackets}</b>
+    </span>
+
+    <span>
+      External <b>{networkMeta.externalConnections}</b>
+    </span>
+
+    <span>
+      Malicious <b>{networkMeta.maliciousIPs}</b>
+    </span>
+
+    <span>
+      Port Scans <b>{networkMeta.portScans}</b>
+    </span>
+
+    <span>
+      Beaconing <b>{networkMeta.beaconingActivities}</b>
+    </span>
+  </div>
+
+<p>{networkMeta.summary}</p>
+</div>
+</>
+)}
+
+
+
+
+        {type === "disk" && diskMeta && (
+          <>
+            <div className="section-title">📈 Disk Analysis Metrics</div>
+            <div className="summary-box log-metrics-box">
+              <div className="log-metric-row">
+                <span>Filesystem <b>{diskMeta.volumeInfo?.fileSystemType || "Unknown"}</b></span>
+                <span>Entries scanned <b>{diskMeta.totalEntries}</b></span>
+                <span>Deleted files <b>{diskMeta.deletedFiles}</b></span>
+                <span>Suspicious files <b>{diskMeta.suspiciousFiles}</b></span>
+                <span>Risk score <b>{diskMeta.riskScore}/100</b></span>
+              </div>
+              {diskMeta.volumeInfo?.volumeName && (
+                <p>Volume: <b>{diskMeta.volumeInfo.volumeName}</b>
+                  {diskMeta.volumeInfo.lastMountTime && ` — Last mount: ${diskMeta.volumeInfo.lastMountTime}`}
+                </p>
+              )}
+              <p>{diskMeta.summary}</p>
+            </div>
+          </>
+        )}
+
+
         {/* TIMELINE */}
         <div className="section-title">⏱ Analysis Timeline</div>
         <div className="timeline" style={{ marginBottom: "32px" }}>
-          {DUMMY_TIMELINE.map((t, i) => (
+          {(type === "log" && logMeta?.timeline?.length ? logMeta.timeline : DUMMY_TIMELINE).map((t, i) => (
             <div key={i} className="timeline-item" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="timeline-time">{t.time}</div>
-              <div className="timeline-event">{t.event}</div>
+              <div className="timeline-time">{t.timestamp ? new Date(t.timestamp).toLocaleString() : t.time}</div>
+              <div className="timeline-event">
+                {t.type ? <><strong>{t.type}</strong> — {t.detail} {t.ip && `(${t.ip})`}</> : t.event}
+              </div>
             </div>
           ))}
         </div>
@@ -154,9 +442,59 @@ const ResultPage = ({ type }) => {
         <div className="btn-group">
           <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← Dashboard</button>
           <button className="btn btn-ghost" onClick={() => navigate("/history")}>View History</button>
+          {type === "log" && (
+  <>
+    <button
+      className="btn btn-success"
+      onClick={() => downloadLogReport("json")}
+    >
+      JSON Report
+    </button>
+
+    <button
+      className="btn btn-ghost"
+      onClick={() => downloadLogReport("markdown")}
+    >
+      Markdown Report
+    </button>
+
+    <button
+      className="btn btn-danger"
+      onClick={() => downloadLogReport("pdf")}
+    >
+      PDF Report
+    </button>
+  </>
+)}
+
+{type === "network" && (
+  <>
+    <button
+      className="btn btn-success"
+      onClick={() => downloadNetworkReport("json")}
+    >
+      JSON Report
+    </button>
+
+    <button
+      className="btn btn-ghost"
+      onClick={() => downloadNetworkReport("markdown")}
+    >
+      Markdown Report
+    </button>
+
+    <button
+      className="btn btn-danger"
+      onClick={() => downloadNetworkReport("pdf")}
+    >
+      PDF Report
+    </button>
+  </>
+)}
           <button className="btn btn-primary" onClick={() => navigate(`/agent/${type}`)}>Run New Scan</button>
         </div>
       </div>
+    
     </>
   );
 };
