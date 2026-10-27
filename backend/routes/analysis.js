@@ -8,7 +8,7 @@ import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
 import History from "../models/History.js";
 import generateReport, { generatePdf } from "../agents/reportAgent.js";
-import generateNReport from "../agents/report.js";
+import generateNReport, { generatePdf as generateNPdf } from "../agents/report.js";
 
 const router = express.Router();
 // 🔐 Integrity Check Function
@@ -159,16 +159,11 @@ router.post("/analyze/disk", async (req, res) => {
 
 router.post("/analyze/network/report", async (req, res) => {
   try {
-   const report = generateNReport(
-  {
-    findings: savedAnalysis.results,
-    meta: {
-      risk: savedAnalysis.risk,
-      agent: "network"
-    }
-  },
-  savedAnalysis.fileName
-);
+    const { findings = [], meta = {}, fileName = "network-evidence" } = req.body;
+    const report = generateNReport(
+      { findings, meta: { ...meta, agent: "network" } },
+      fileName
+    );
     const format = req.query.format || "json";
 
     if (format === "markdown") {
@@ -176,7 +171,7 @@ router.post("/analyze/network/report", async (req, res) => {
     }
 
     if (format === "pdf") {
-      const pdf = await generatePdf(report);
+      const pdf = await generateNPdf(report);
       return res.type("application/pdf").send(pdf);
     }
 
@@ -223,7 +218,7 @@ router.get("/analyze/network/report/:analysisId", async (req, res) => {
     if (format === "pdf") {
       return res
         .type("application/pdf")
-        .send(await generatePdf(report));
+        .send(await generateNPdf(report));
     }
 
     return res.json(report.json);

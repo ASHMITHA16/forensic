@@ -7,7 +7,9 @@ import Evidence from "../models/Evidence.js";
 
 const router = express.Router();
 const UPLOAD_DIR = "uploads";
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+// Memory dumps and disk images are routinely multi-GB; text logs keep the tighter cap.
+const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 32 * 1024 * 1024 * 1024);
+const MAX_TEXT_UPLOAD_BYTES = Number(process.env.MAX_TEXT_UPLOAD_BYTES || 50 * 1024 * 1024);
 const ALLOWED_EXTENSIONS = new Set([".txt", ".log", ".json", ".img", ".dd", ".ad1", ".raw", ".mem", ".pcap", ".pcapng"]);
 const TEXT_EXTENSIONS = new Set([".txt", ".log", ".json"]);
 const TEXT_MIME_TYPES = new Set(["text/plain", "application/json", "application/octet-stream", ""]);
@@ -62,6 +64,10 @@ router.post("/upload", (req, res, next) => upload.single("file")(req, res, (err)
     const filePath = req.file.path;
     const extension = path.extname(req.file.originalname).toLowerCase();
     if (TEXT_EXTENSIONS.has(extension)) {
+      if (req.file.size > MAX_TEXT_UPLOAD_BYTES) {
+        fs.unlinkSync(filePath);
+        return res.status(400).json({ error: "Log files must be 50 MB or smaller" });
+      }
       await validateUtf8(filePath);
     }
 
