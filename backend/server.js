@@ -21,6 +21,9 @@ app.use("/api", historyRoutes);
 
 const PORT = 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
+// Multi-GB memory/disk image uploads outlast Node's default 5-minute request timeout
+server.requestTimeout = 0;

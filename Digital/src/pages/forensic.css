@@ -700,7 +700,28 @@ body {
 .log-metric-row span { color: var(--text-muted); font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; }
 .log-metric-row b { display: block; color: var(--text-primary); font-size: 0.9rem; margin-top: 3px; text-transform: none; }
 
+.mem-alternatives { margin-top: 12px; font-size: 0.78rem; color: var(--text-secondary); }
+.mem-alternatives strong { display: block; color: var(--text-muted); font-family: var(--mono); font-size: 0.64rem; text-transform: uppercase; margin-bottom: 4px; }
+.mem-alternatives ul, .mem-limitations { margin: 0; padding-left: 18px; }
+.mem-alternatives li, .mem-limitations li { margin-bottom: 4px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.mem-mitre { margin-top: 12px; }
+.mem-status-banner {
+  margin: 0 0 24px;
+  padding: 14px 18px;
+  border: 1px solid var(--warn);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: rgba(251,191,36,0.06);
+}
+.mem-status-banner strong { color: var(--warn); font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em; }
+.mem-status-banner p { color: var(--text-secondary); margin-top: 6px; font-size: 0.82rem; }
+.mem-ioc-list { display: flex; flex-direction: column; gap: 8px; }
+.mem-ioc { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.mem-ioc code { font-family: var(--mono); font-size: 0.74rem; color: var(--text-primary); overflow-wrap: anywhere; }
+.mem-ioc small { color: var(--text-muted); font-family: var(--mono); font-size: 0.64rem; }
+
 @media (max-width: 700px) {
+  .mem-ioc { grid-template-columns: minmax(0, 1fr); }
   .log-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .log-metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

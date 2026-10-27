@@ -40,11 +40,62 @@ KNOWN_SYSTEM_SERVICE_HOSTS = frozenset({
     "svchost.exe", "services.exe", "lsass.exe", "spoolsv.exe", "msiexec.exe",
 })
 
+#: Subdirectories of ProgramData whose ACL admits only SYSTEM and
+#: TrustedInstaller. Defender updates its own platform binaries here, so
+#: its service binary moving under ProgramData is expected, not writable.
+PROTECTED_PROGRAMDATA_DIRECTORIES = (
+    "\\programdata\\microsoft\\windows defender\\platform\\",
+    "\\programdata\\microsoft\\windows defender advanced threat protection\\",
+)
+
+#: Lowest kernel-space address per architecture. A pool-carved "module"
+#: below it is not a loaded driver whatever its tag says. Vol3 prints x64
+#: kernel addresses without sign extension (ntoskrnl at 0xf80162a14000),
+#: so the x64 floor is bit 47, which the canonical 0xffff8... form also clears.
+KERNEL_SPACE_FLOOR = {"x64": 0x800000000000, "x86": 0x80000000}
+
+#: Extensions a kernel image can carry (ntoskrnl.exe, hal.dll, *.sys).
+KERNEL_IMAGE_EXTENSIONS = (".sys", ".dll", ".exe")
+
+
+def _as_int(value) -> int | None:
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value), 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _plausible_kernel_module(obs, arch: str | None) -> bool:
+    """
+    Reject pool-scanner carvings that cannot be a kernel image.
+
+    ``windows.modscan`` matches on pool tags, and on a real image a large
+    share of its hits are stale or coincidental: no name, a name of one
+    stray character, a base of 0x0 or an address in user space. Reporting
+    those as hidden drivers buries the one that matters.
+    """
+    name = obs.get("name")
+    if not isinstance(name, str) or not name.isascii() or not name.isprintable():
+        return False
+    if not name.lower().endswith(KERNEL_IMAGE_EXTENSIONS):
+        return False
+    base = _as_int(obs.get("base"))
+    if base is None:
+        return False
+    # An address wider than 32 bits can only come from a 64-bit image
+    if arch == "x64" or base > 0xFFFFFFFF:
+        return base >= KERNEL_SPACE_FLOOR["x64"]
+    return base >= KERNEL_SPACE_FLOOR["x86"]
+
 
 # ── MEM-M-001 ─────────────────────────────────────────────────────────
 
 
 def hidden_kernel_module(context: DetectionContext) -> Iterable[RuleHit]:
+    arch = context.environment.get("arch")
+    rejected = 0
     for obs in context.modules:
         if obs.get("scope") != "kernel":
             continue
@@ -53,6 +104,9 @@ def hidden_kernel_module(context: DetectionContext) -> Iterable[RuleHit]:
         # `is False` / `is True`, not truthiness: None means the source
         # did not run, and would otherwise read as "absent".
         if cross.get("modules") is not False or cross.get("modscan") is not True:
+            continue
+        if not _plausible_kernel_module(obs, arch):
+            rejected += 1
             continue
 
         name = obs.get("name")
@@ -90,11 +144,23 @@ def hidden_kernel_module(context: DetectionContext) -> Iterable[RuleHit]:
             ),
         )
 
+    if rejected:
+        context.rule_notes.append(
+            f"MEM-M-001 set aside {rejected} windows.modscan record(s) absent from "
+            f"windows.modules because they cannot be kernel images (no readable "
+            f"driver name, or a base outside kernel space). These are pool-scanner "
+            f"carvings of stale or coincidental data; the raw rows remain in "
+            f"raw/windows.modscan.json."
+        )
+
 
 # ── MEM-S-001 ─────────────────────────────────────────────────────────
 
 
 def suspicious_service_binary(context: DetectionContext) -> Iterable[RuleHit]:
+    # svcscan carves service records from memory and returns the same
+    # service several times over. One finding per (service, binary).
+    seen: dict[tuple[str, str], RuleHit] = {}
     for obs in context.services:
         path = obs.get("executable_path_normalised")
         name = str(obs.get("executable_name") or "").lower()
@@ -119,7 +185,16 @@ def suspicious_service_binary(context: DetectionContext) -> Iterable[RuleHit]:
             continue
 
         directory, why, weight = match
+        if directory == "\\programdata\\" and any(
+            d in path for d in PROTECTED_PROGRAMDATA_DIRECTORIES
+        ):
+            continue
+
         service = obs.get("name")
+        key = (str(service or "").lower(), path)
+        if key in seen:
+            seen[key].observation_refs.append(obs.obs_id)
+            continue
 
         adjustments = [(weight, f"+{weight:.2f} located in {why}")]
         # Volatility renders this as SERVICE_AUTO_START, not "Auto".
@@ -131,7 +206,7 @@ def suspicious_service_binary(context: DetectionContext) -> Iterable[RuleHit]:
                 "survives reboot without user action",
             ))
 
-        yield RuleHit(
+        seen[key] = RuleHit(
             observation_refs=[obs.obs_id],
             entities={
                 "services": [service] if service else [],
@@ -166,6 +241,8 @@ def suspicious_service_binary(context: DetectionContext) -> Iterable[RuleHit]:
             ),
             confidence_adjustments=adjustments,
         )
+
+    yield from seen.values()
 
 
 RULES = (

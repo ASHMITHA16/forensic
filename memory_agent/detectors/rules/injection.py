@@ -46,6 +46,39 @@ def _is_own_image(module) -> bool:
     return bool(name) and name == process
 
 
+#: Files mapped as data, never handed to the loader, so they appear in no
+#: PEB list by design: resource (.mui), WinRT metadata, NLS tables, fonts.
+#: A path with no extension or an unknown one is still evaluated.
+DATA_MAPPING_EXTENSIONS = frozenset({
+    ".mui", ".winmd", ".nls", ".dat", ".ttf", ".ttc", ".fon", ".otf", ".tlb",
+})
+
+
+def _is_data_mapping(module) -> bool:
+    path = str(module.get("mapped_path") or "").lower()
+    return any(path.endswith(ext) for ext in DATA_MAPPING_EXTENSIONS)
+
+
+#: Directories only TrustedInstaller can write, holding signed OS images.
+PROTECTED_SYSTEM_DIRECTORIES = (
+    "\\windows\\system32\\", "\\windows\\syswow64\\", "\\windows\\winsxs\\",
+)
+
+
+def _readable_mapped_path(module) -> str | None:
+    """
+    The mapped path, or None when it is missing or unreadable.
+
+    When the FILE_OBJECT name is not resident, Vol3 decodes whatever bytes
+    are there as UTF-16 and returns a "path" of CJK noise with no
+    separator. That is absence of data, not a file name.
+    """
+    path = module.get("mapped_path")
+    if not isinstance(path, str) or "\\" not in path or not path.isprintable():
+        return None
+    return path
+
+
 # ── MEM-I-001 ─────────────────────────────────────────────────────────
 
 
@@ -149,8 +182,33 @@ def code_in_private_executable_memory(
 
 
 def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
-    for obs in context.modules:
-        if obs.get("scope") != "user":
+    user_modules = [o for o in context.modules if o.get("scope") == "user"]
+
+    # A live process always has its own image and ntdll in InLoadOrder, and
+    # no rootkit can unlink every module and keep running. A process with
+    # no module in that list had its PEB loader data paged out of the
+    # image: every module reads as "absent", which says nothing about hiding.
+    readable_pids = {
+        o.get("pid") for o in user_modules
+        if (o.get("peb_lists") or {}).get("in_load") is True
+    }
+    unreadable = sorted(
+        {(o.get("pid"), str(o.get("process") or "?")) for o in user_modules
+         if o.get("pid") not in readable_pids},
+        key=lambda item: (item[0] is None, item[0] or 0),
+    )
+    if unreadable:
+        context.rule_notes.append(
+            f"MEM-I-002 was not evaluated for {len(unreadable)} process(es) whose "
+            f"PEB loader lists could not be read from the image (no module in "
+            f"InLoadOrder, typically because the pages were not resident): "
+            + ", ".join(f"{name} (PID {pid})" for pid, name in unreadable[:15])
+            + (", ..." if len(unreadable) > 15 else "")
+            + ". Unlinked modules in these processes would not be detected."
+        )
+
+    for obs in user_modules:
+        if obs.get("pid") not in readable_pids:
             continue
 
         lists = obs.get("peb_lists") or {}
@@ -161,14 +219,19 @@ def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
             continue
         if all(values.values()):
             continue
-        if _is_own_image(obs):
+        if _is_own_image(obs) or _is_data_mapping(obs):
             continue
 
         missing = sorted(k for k, v in values.items() if v is False)
         present = sorted(k for k, v in values.items() if v is True)
         pid = obs.get("pid")
+        mapped_path = _readable_mapped_path(obs)
+        in_system_dir = mapped_path is not None and any(
+            d in mapped_path.lower() for d in PROTECTED_SYSTEM_DIRECTORIES
+        )
 
         adjustments = []
+        severity = None
         if len(missing) == 1 and "in_init" in missing:
             adjustments.append((
                 -0.25,
@@ -176,11 +239,26 @@ def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
                 "happens legitimately for modules the loader has mapped but "
                 "not yet initialised",
             ))
+            severity = "LOW"
         if not present:
             adjustments.append((
                 0.10,
                 "+0.10 the module is absent from every PEB list while remaining "
                 "mapped and readable",
+            ))
+        if in_system_dir:
+            adjustments.append((
+                -0.20,
+                "-0.20 the image is backed by a file in a TrustedInstaller-owned "
+                "system directory; a loader-list walk cut short by a non-resident "
+                "page leaves exactly this pattern for signed OS DLLs",
+            ))
+            severity = severity or "MEDIUM"
+        elif mapped_path is None and not present:
+            adjustments.append((
+                0.10,
+                "+0.10 no readable file backs this image mapping, so the code "
+                "cannot be attributed to anything on disk",
             ))
 
         yield RuleHit(
@@ -195,7 +273,10 @@ def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
                 f"({obs.get('process')}) is present in PEB list(s) "
                 f"{', '.join(present) or 'none'} and absent from "
                 f"{', '.join(missing)}. Its mapped path is "
-                f"{obs.get('mapped_path') or 'not recorded'}."
+                + (mapped_path if mapped_path else
+                   "unreadable (not resident in the image)"
+                   if obs.get("mapped_path") else "not recorded")
+                + "."
             ),
             interpretation=(
                 "A module mapped into the process but missing from one or more "
@@ -209,6 +290,9 @@ def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
                 "resource file appears in no loader list by design.",
                 "A partially-completed load captured mid-flight, where the "
                 "loader had not yet linked the module into every list.",
+                "A loader-list node that was paged out when the image was "
+                "taken, which breaks the walk and makes every later module "
+                "in that list read as absent.",
             ],
             analyst_action=(
                 "Dump the region at the recorded base address and identify it. "
@@ -216,6 +300,7 @@ def peb_unlinked_module(context: DetectionContext) -> Iterable[RuleHit]:
                 "raises different questions than an unidentifiable image."
             ),
             confidence_adjustments=adjustments,
+            severity_override=severity,
         )
 
 

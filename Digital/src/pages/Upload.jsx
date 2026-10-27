@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./forensic.css";// adjust path to match your project structure
 import { useLocation } from "react-router-dom";
+import { runMemoryJob } from "./memoryJob";
 
 const Upload = () => {
   const [file, setFile] = useState(null);
@@ -92,8 +93,9 @@ const Upload = () => {
   const handleMemoryAnalysis = async () => {
     if (!uploadedPath) { alert("Upload file first!"); return; }
     try {
-      const res = await axios.post("http://localhost:5000/api/analyze/memory", { filePath: uploadedPath });
-      setMemoryAnalysis(res.data.data);
+      // Background job: a real dump outlasts a single HTTP request
+      const result = await runMemoryJob(uploadedPath);
+      setMemoryAnalysis(result.data);
     } catch (err) {
       console.error(err);
       alert("Memory analysis failed ❌");
@@ -114,7 +116,7 @@ const Upload = () => {
   const acceptedTypes = {
   "Disk Agent": ".img,.dd,.ad1",
   "Log Agent": ".txt,.log",
-  "Memory Agent": ".raw,.mem",
+  "Memory Agent": ".raw,.mem,.dmp,.vmem,.lime",
   "Network Agent": ".pcap,.pcapng"
 };
 
@@ -190,9 +192,10 @@ const Upload = () => {
         {memoryAnalysis.length === 0
           ? <p className="result-empty">— no memory issues found —</p>
           : memoryAnalysis.map((item, index) => (
-            <div key={index} className={`forensic-card ${item.type === "Suspicious Process" ? "mem-suspicious" : "mem-ok"}`}>
+            <div key={index} className={`forensic-card ${item.type === "Suspicious Process" || item.suspicious ? "mem-suspicious" : "mem-ok"}`}>
               <p>{item.process}</p>
               <strong>{item.type}</strong>
+              {item.severity && <span className={`severity-chip ${item.severity}`}>{item.severity.toUpperCase()}</span>}
             </div>
           ))}
       </div>

@@ -105,12 +105,35 @@ def hidden_process(context: DetectionContext) -> Iterable[RuleHit]:
                 "-0.35 the process has a recorded exit time, so absence from "
                 "the active process list is expected rather than anomalous",
             ))
-        if psxview.get("thrdproc") is True or psxview.get("csrss") is True:
+        # Vol3 2.x names the thread view "thrdscan"; older builds "thrdproc"
+        thread_view = psxview.get("thrdscan", psxview.get("thrdproc"))
+        if thread_view is True or psxview.get("csrss") is True:
             adjustments.append((
                 0.08,
                 "+0.08 independently visible to a thread-based or CSRSS-based "
                 "enumeration source",
             ))
+        in_rundown = False
+        if thread_view is False and psxview.get("csrss") is False:
+            # A live process hidden by DKOM still runs threads and is still
+            # known to csrss. Seen by the pool scan alone, it is a remnant.
+            adjustments.append((
+                -0.20,
+                "-0.20 neither the thread scan nor csrss sees this process; "
+                "only the pool scanner does, which is the signature of a "
+                "freed EPROCESS rather than a running one",
+            ))
+            in_rundown = True
+        handles_recorded = "handles" in (obs.fields or {})
+        if not exited and handles_recorded and obs.get("handles") is None and in_psscan is True:
+            # ObKillProcess clears ObjectTable early in process teardown;
+            # an unlinked but running process keeps its handle table.
+            adjustments.append((
+                -0.15,
+                "-0.15 the process has no handle table, which Windows removes "
+                "early in process teardown",
+            ))
+            in_rundown = True
 
         yield RuleHit(
             observation_refs=[obs.obs_id],
@@ -153,7 +176,7 @@ def hidden_process(context: DetectionContext) -> Iterable[RuleHit]:
             ),
             confidence_adjustments=adjustments,
             first_seen_utc=obs.get("create_time_utc"),
-            severity_override="MEDIUM" if exited else None,
+            severity_override="MEDIUM" if exited or in_rundown else None,
         )
 
 

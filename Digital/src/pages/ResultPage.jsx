@@ -46,7 +46,35 @@ const RESULT_CONFIG = {
   },
   memory: {
     icon: "🧠", title: "Memory Analysis Results",
-    renderCard: (item, i) => (
+    renderCard: (item, i) => item.ruleId ? (
+      <div key={i} className={`forensic-card log-finding log-${item.severity || "info"}`}
+           style={{ animationDelay: `${i * 0.05}s` }}>
+        <div className="log-finding-header">
+          <strong>{item.type}</strong>
+          <span className={`severity-chip ${item.severity || "info"}`}>{(item.severity || "info").toUpperCase()}</span>
+        </div>
+        <p className="log-explanation">{item.explanation}</p>
+        <div className="log-detail-grid">
+          <span><b>Rule</b>{item.ruleId}</span>
+          <span><b>Process</b>{item.process || "-"}</span>
+          <span><b>PID</b>{item.pids?.length ? item.pids.join(", ") : "-"}</span>
+          <span><b>Confidence</b>{item.confidence}%</span>
+        </div>
+        <p className="log-raw"><strong>Observed:</strong> {item.observation}</p>
+        {item.alternatives?.length > 0 && (
+          <div className="mem-alternatives">
+            <strong>Benign explanations to rule out</strong>
+            <ul>{item.alternatives.map((alt, j) => <li key={j}>{alt}</li>)}</ul>
+          </div>
+        )}
+        {item.analystAction && <p className="log-raw"><strong>Next step:</strong> {item.analystAction}</p>}
+        {item.mitre?.length > 0 && (
+          <div className="log-coverage-list mem-mitre">
+            {item.mitre.map((t) => <span key={t}>{t}</span>)}
+          </div>
+        )}
+      </div>
+    ) : (
       <div key={i} className={`forensic-card ${item.type === "Suspicious Process" ? "mem-suspicious" : "mem-ok"}`}
            style={{ animationDelay: `${i * 0.05}s` }}>
         <p><strong>Process:</strong> {item.process}</p>
@@ -137,6 +165,8 @@ const ResultPage = ({ type }) => {
  const logMeta = type === "log" ? readStoredObject("result_log_meta") : null;
 const networkMeta = type === "network" ? readStoredObject("result_network_meta") : null;
 const diskMeta = type === "disk" ? readStoredObject("result_disk_meta") : null;
+const memoryMeta = type === "memory" ? readStoredObject("result_memory_meta") : null;
+const memoryAnalysisId = type === "memory" ? sessionStorage.getItem("result_memory_id") : null;
 
 const logAnalysisId =
   type === "log"
@@ -164,6 +194,8 @@ const risk =
     ? logMeta.risk.toLowerCase()
     : type === "network"
     ? networkRisk.toLowerCase()
+    : type === "memory" && memoryMeta?.risk
+    ? (data.length === 0 ? "none" : memoryMeta.risk.toLowerCase())
     : deriveRisk(data);
 
 const logConfidence =
@@ -190,6 +222,24 @@ const logConfidence =
     } catch (error) {
       console.error(error);
       alert(`${format.toUpperCase()} report generation failed.`);
+    }
+  };
+
+  const downloadMemoryEnvelope = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/analyze/memory/envelope/${memoryAnalysisId}`,
+        { responseType: "blob" }
+      );
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${fileName.replace(/[^a-z0-9._-]/gi, "_")}-memory_agent_output.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Memory envelope download failed.");
     }
   };
 
@@ -316,6 +366,24 @@ const logConfidence =
     </div>
   </>
 )}
+            {type === "memory" && memoryMeta && (
+              <>
+                <div className="meta-item">
+                  <div className="meta-key">Envelope Status</div>
+                  <div className="meta-val">{memoryMeta.status}</div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Evidence Integrity</div>
+                  <div className="meta-val">
+                    {memoryMeta.mode === "replay" ? "Not sealed (demo)" : memoryMeta.integrityVerified ? "Verified" : "FAILED"}
+                  </div>
+                </div>
+                <div className="meta-item">
+                  <div className="meta-key">Risk Score</div>
+                  <div className="meta-val">{memoryMeta.riskScore ?? "-"} / 100</div>
+                </div>
+              </>
+            )}
             {type === "disk" && diskMeta && (
               <>
                 <div className="meta-item">
@@ -404,6 +472,66 @@ const logConfidence =
 
 
 
+        {type === "memory" && memoryMeta && (
+          <>
+            {(memoryMeta.mode === "replay" || memoryMeta.status === "INVALID") && (
+              <div className="mem-status-banner">
+                <strong>{memoryMeta.mode === "replay" ? "DEMO REPLAY — NOT EVIDENCE" : "INTEGRITY FAILURE — NOT ADMISSIBLE"}</strong>
+                <p>{memoryMeta.statusBasis}</p>
+              </div>
+            )}
+            <div className="section-title">📈 Memory Analysis Metrics</div>
+            <div className="summary-box log-metrics-box">
+              <div className="log-metric-row">
+                <span>Case <b>{memoryMeta.caseId}</b></span>
+                <span>OS <b>{memoryMeta.os}</b></span>
+                <span>Plugins <b>{memoryMeta.coverage?.pluginsSucceeded}/{memoryMeta.coverage?.pluginsAttempted}</b></span>
+                <span>Rules evaluated <b>{memoryMeta.coverage?.rulesEvaluated}/{memoryMeta.coverage?.rulesTotal}</b></span>
+              </div>
+              <div className="log-metric-row" style={{ marginTop: "12px" }}>
+                {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((s) => (
+                  <span key={s}>{s.toLowerCase()} <b>{memoryMeta.findingsBySeverity?.[s] || 0}</b></span>
+                ))}
+              </div>
+              {memoryMeta.evidence?.sha256 && (
+                <p>SHA-256: <b style={{ fontFamily: "var(--mono)", overflowWrap: "anywhere" }}>{memoryMeta.evidence.sha256}</b></p>
+              )}
+              {memoryMeta.discrepancies?.length > 0 && memoryMeta.mode !== "replay" && (
+                <p>Discrepancies: {memoryMeta.discrepancies.join("; ")}</p>
+              )}
+              <p>{memoryMeta.summary}</p>
+            </div>
+
+            {memoryMeta.iocs?.length > 0 && (
+              <>
+                <div className="section-title">🎯 Indicators of Compromise ({memoryMeta.iocs.length})</div>
+                <div className="summary-box">
+                  <div className="mem-ioc-list">
+                    {memoryMeta.iocs.map((ioc, i) => (
+                      <div key={i} className="mem-ioc">
+                        <span className="severity-chip info">{ioc.type}</span>
+                        <code>{ioc.value}</code>
+                        <small>{ioc.confidence}% · FP risk {ioc.falsePositiveRisk}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {memoryMeta.limitations?.length > 0 && (
+              <>
+                <div className="section-title">⚠ Limitations</div>
+                <div className="summary-box">
+                  <ul className="mem-limitations">
+                    {memoryMeta.limitations.map((l, i) => <li key={i}>{l}</li>)}
+                  </ul>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {type === "disk" && diskMeta && (
           <>
             <div className="section-title">📈 Disk Analysis Metrics</div>
@@ -429,7 +557,9 @@ const logConfidence =
         {/* TIMELINE */}
         <div className="section-title">⏱ Analysis Timeline</div>
         <div className="timeline" style={{ marginBottom: "32px" }}>
-          {(type === "log" && logMeta?.timeline?.length ? logMeta.timeline : DUMMY_TIMELINE).map((t, i) => (
+          {(type === "log" && logMeta?.timeline?.length ? logMeta.timeline
+            : type === "memory" && memoryMeta?.timeline?.length ? memoryMeta.timeline
+            : DUMMY_TIMELINE).map((t, i) => (
             <div key={i} className="timeline-item" style={{ animationDelay: `${i * 0.08}s` }}>
               <div className="timeline-time">{t.timestamp ? new Date(t.timestamp).toLocaleString() : t.time}</div>
               <div className="timeline-event">
@@ -465,6 +595,12 @@ const logConfidence =
       PDF Report
     </button>
   </>
+)}
+
+{type === "memory" && memoryMeta?.envelopePath && memoryAnalysisId && (
+  <button className="btn btn-success" onClick={downloadMemoryEnvelope}>
+    Output Envelope (JSON)
+  </button>
 )}
 
 {type === "network" && (

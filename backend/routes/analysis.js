@@ -1,8 +1,9 @@
 import express from "express";
+import fs from "fs";
 import analyzeDisk from "../agents/diskAgent.js";
 import analyzeLogs from "../agents/logAgent.js";
 import analyzeNetwork from "../agents/networkAgent.js";
-import analyzeMemory from "../agents/memoryAgent.js";
+import analyzeMemory, { replayMemoryDemo, startMemoryJob, getMemoryJob } from "../agents/memoryAgent.js";
 import correlate from "../agents/correlationAgent.js";
 import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
@@ -100,24 +101,102 @@ router.get("/analyze/log/report/:analysisId", async (req, res) => {
 });
 
 
+// Integrity check → memory agent → History. Shared by the sync and job paths.
+const runMemoryAnalysis = async (filePath, caseId) => {
+  const integrity = await verifyIntegrity(filePath);
+  if (integrity.isTampered) {
+    const err = new Error("⚠️ File tampered. Cannot analyze.");
+    err.status = 400;
+    err.integrity = integrity;
+    throw err;
+  }
+
+  const analysis = await analyzeMemory(filePath, { caseId });
+
+  const savedAnalysis = await History.create({
+    agent: "memory",
+    fileName: filePath.split(/[/\\]/).pop(),
+    findings: analysis.findings.length,
+    risk: analysis.meta.risk.toLowerCase(),
+    results: analysis.findings,
+    analysisMeta: analysis.meta,
+    evidenceHash: integrity.currentHash,
+  });
+
+  return {
+    message: "Memory analysis completed",
+    analysisId: savedAnalysis._id,
+    data: analysis.findings,
+    meta: analysis.meta,
+  };
+};
+
+// { filePath, async: true } → 202 { jobId }; poll GET /analyze/memory/jobs/:jobId.
+// Without `async` the request waits for the result (fine for small images only).
 router.post("/analyze/memory", async (req, res) => {
+  const { filePath, async: runAsync } = req.body;
+
+  if (!filePath) {
+    return res.status(400).json({ error: "filePath is required" });
+  }
+
+  if (runAsync) {
+    const job = startMemoryJob(filePath, (caseId) => runMemoryAnalysis(filePath, caseId));
+    return res.status(202).json({ message: "Memory analysis started", jobId: job.id });
+  }
+
   try {
-    const { filePath } = req.body;
-
-    const integrity = await verifyIntegrity(filePath);
-    if (integrity.isTampered) {
-      return res.status(400).json({
-        message: "⚠️ File tampered. Cannot analyze.",
-        integrity
-      });
-    }
-
-    const result = analyzeMemory(filePath);
-
-    res.json({ data: result });
-
+    res.json(await runMemoryAnalysis(filePath));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.integrity) {
+      return res.status(400).json({ message: err.message, integrity: err.integrity });
+    }
+    res.status(err.status || 500).json({ error: err.message, code: err.code || null });
+  }
+});
+
+router.get("/analyze/memory/jobs/:jobId", (req, res) => {
+  const job = getMemoryJob(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Memory analysis job not found (the server may have restarted)" });
+  res.json(job);
+});
+
+// Demo: replays the bundled Volatility plugin output — no memory image is read
+router.post("/analyze/memory/demo", async (req, res) => {
+  try {
+    const analysis = await replayMemoryDemo();
+
+    const savedAnalysis = await History.create({
+      agent: "memory",
+      fileName: "demo-replay (windows_case fixtures)",
+      findings: analysis.findings.length,
+      risk: analysis.meta.risk.toLowerCase(),
+      results: analysis.findings,
+      analysisMeta: analysis.meta,
+    });
+
+    res.json({
+      message: "Memory demo replay completed",
+      analysisId: savedAnalysis._id,
+      data: analysis.findings,
+      meta: analysis.meta,
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || null });
+  }
+});
+
+// Full memory agent output envelope (memory_agent_output.json) for a saved run
+router.get("/analyze/memory/envelope/:analysisId", async (req, res) => {
+  try {
+    const savedAnalysis = await History.findOne({ _id: req.params.analysisId, agent: "memory" });
+    const envelopePath = savedAnalysis?.analysisMeta?.envelopePath;
+    if (!envelopePath || !fs.existsSync(envelopePath)) {
+      return res.status(404).json({ error: "Memory envelope not found" });
+    }
+    return res.type("application/json").sendFile(envelopePath);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 });
 

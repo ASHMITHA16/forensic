@@ -38,6 +38,7 @@ from memory_agent.core.runner import (
     PluginResult,
     ToolchainInfo,
     VolatilityRunner,
+    _plugin_names,
     flatten_treegrid,
 )
 
@@ -152,6 +153,25 @@ class RunnerParsingTests(unittest.TestCase):
             plugin_list_source="unavailable", probe_duration_s=0.1,
         )
         self.assertIsNone(self.runner.has_plugin("windows.pslist"))
+
+    def test_plugin_list_is_parsed_from_every_line_of_vol_help(self) -> None:
+        # Shape of `vol -h` from Volatility 2.28: options first, then one
+        # plugin per line. Anchoring to the start of the blob alone finds none.
+        help_text = (
+            "Volatility 3 Framework 2.28.2\n"
+            "  -h, --help            Show this help message and exit\n"
+            "  PLUGIN\n"
+            "    banners.Banners     Attempts to identify potential linux banners\n"
+            "    windows.info.Info   Show OS & kernel details\n"
+            "    windows.malfind.Malfind\n"
+            "    windows.registry.hivelist.HiveList\n"
+        )
+        names = _plugin_names(help_text)
+        # Both invocation forms are present, so callers using either resolve
+        for name in ("banners.Banners", "windows.info", "windows.info.Info",
+                     "windows.malfind", "windows.registry.hivelist"):
+            self.assertIn(name, names)
+        self.assertNotIn("banners", names)
 
     def test_probe_failure_names_the_attempts(self) -> None:
         runner = VolatilityRunner(

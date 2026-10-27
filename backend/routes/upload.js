@@ -10,7 +10,7 @@ const UPLOAD_DIR = "uploads";
 // Memory dumps and disk images are routinely multi-GB; text logs keep the tighter cap.
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 32 * 1024 * 1024 * 1024);
 const MAX_TEXT_UPLOAD_BYTES = Number(process.env.MAX_TEXT_UPLOAD_BYTES || 50 * 1024 * 1024);
-const ALLOWED_EXTENSIONS = new Set([".txt", ".log", ".json", ".img", ".dd", ".ad1", ".raw", ".mem", ".pcap", ".pcapng"]);
+const ALLOWED_EXTENSIONS = new Set([".txt", ".log", ".json", ".img", ".dd", ".ad1", ".raw", ".mem", ".dmp", ".vmem", ".lime", ".pcap", ".pcapng"]);
 const TEXT_EXTENSIONS = new Set([".txt", ".log", ".json"]);
 const TEXT_MIME_TYPES = new Set(["text/plain", "application/json", "application/octet-stream", ""]);
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { runMemoryJob, describeMemoryProgress } from "./memoryJob";
 
 const AGENT_CONFIG = {
   disk: {
@@ -25,6 +26,8 @@ const AGENT_CONFIG = {
     endpoint: "/api/analyze/memory",
     result: "/result/memory",
     color: "#818cf8",
+    description: "Seal the dump (SHA-256 chain of custody), run Volatility 3, normalise plugin output, apply the 17-rule detection pack, and re-verify the evidence afterwards.",
+    coverage: ["Hidden / orphaned processes", "Code injection (malfind)", "Unlinked modules", "Encoded PowerShell", "Suspicious network sockets", "Rogue services"],
   },
   network: {
     icon: "🌐",
@@ -43,12 +46,46 @@ const AgentPage = ({ type }) => {
   const [uploadedPath, setUploadedPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState("idle");
+  const [memoryJob, setMemoryJob] = useState(null);
 
   const acceptedTypes = {
     disk: ".img,.dd,.ad1,.raw",
     log: ".txt,.log",
-    memory: ".raw,.mem",
+    memory: ".raw,.mem,.dmp,.vmem,.lime",
     network: ".pcap,.pcapng",
+  };
+
+  const storeMemoryResult = (res, fileLabel) => {
+    sessionStorage.setItem("result_memory", JSON.stringify(res.data.data));
+    sessionStorage.setItem("result_memory_file", fileLabel);
+    sessionStorage.setItem("result_memory_meta", JSON.stringify(res.data.meta || {}));
+    if (res.data.analysisId) {
+      sessionStorage.setItem("result_memory_id", String(res.data.analysisId));
+    }
+  };
+
+  const memoryErrorMessage = (err) =>
+    err.response?.data?.error
+      ? `Memory analysis failed ❌\n\n${err.response.data.error}`
+      : "Memory analysis failed ❌";
+
+  // Demo: replays the bundled Volatility output through the memory agent pipeline
+  const handleMemoryDemo = async () => {
+    setLoading(true);
+    setPhase("analyzing");
+    sessionStorage.removeItem("result_memory_meta");
+    sessionStorage.removeItem("result_memory_id");
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/analyze/memory/demo");
+      storeMemoryResult(res, "demo-replay (windows_case fixtures)");
+      navigate(config.result);
+    } catch (err) {
+      console.error(err);
+      alert(memoryErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -123,13 +160,22 @@ const AgentPage = ({ type }) => {
     sessionStorage.removeItem("result_network_id");
   }
 
+  if (type === "memory") {
+    sessionStorage.removeItem("result_memory_meta");
+    sessionStorage.removeItem("result_memory_id");
+    setMemoryJob(null);
+  }
+
   try {
-    const res = await axios.post(
-      `http://localhost:5000${config.endpoint}`,
-      {
-        filePath: uploadedPath,
-      }
-    );
+    // Memory runs as a background job: a real dump outlasts a single HTTP request
+    const res = type === "memory"
+      ? { data: await runMemoryJob(uploadedPath, setMemoryJob) }
+      : await axios.post(
+          `http://localhost:5000${config.endpoint}`,
+          {
+            filePath: uploadedPath,
+          }
+        );
 
     // Store findings
     sessionStorage.setItem(
@@ -187,10 +233,15 @@ const AgentPage = ({ type }) => {
       }
     }
 
+    // Memory Agent
+    if (type === "memory") {
+      storeMemoryResult(res, file?.name || "unknown");
+    }
+
     navigate(config.result);
   } catch (err) {
     console.error(err);
-    alert("Analysis failed ❌");
+    alert(type === "memory" ? memoryErrorMessage(err) : "Analysis failed ❌");
   } finally {
     setLoading(false);
   }
@@ -259,6 +310,17 @@ const AgentPage = ({ type }) => {
                 ? "Analyzing…"
                 : `Run ${config.title}`}
             </button>
+
+            {type === "memory" && (
+              <button
+                className="btn btn-ghost"
+                onClick={handleMemoryDemo}
+                disabled={loading}
+                title="Runs the detection pipeline on bundled Volatility output — no memory image is read"
+              >
+                Run Demo Case
+              </button>
+            )}
           </div>
 
           {loading && (
@@ -268,6 +330,8 @@ const AgentPage = ({ type }) => {
               <div className="loading-text">
                 {phase === "uploading"
                   ? "Uploading file to server…"
+                  : type === "memory" && uploadedPath
+                  ? describeMemoryProgress(memoryJob)
                   : `Running ${config.title}...`}
               </div>
             </div>
@@ -289,7 +353,7 @@ const AgentPage = ({ type }) => {
           )}
         </div>
 
-        {type === "log" && (
+        {(type === "log" || type === "memory") && (
           <div className="log-agent-guide">
             <div className="section-title">📡 Detection coverage</div>
             <p>{config.description}</p>

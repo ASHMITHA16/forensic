@@ -13,6 +13,9 @@
 
 const RISK = { LOW: "LOW", MEDIUM: "MEDIUM", HIGH: "HIGH" };
 
+// Legacy memory items use type "Suspicious Process"; the Python memory agent flags `suspicious`
+const isSuspiciousMemory = (m) => m.type === "Suspicious Process" || m.suspicious === true;
+
 /**
  * Known-bad patterns we look for when cross-referencing agents.
  * Each rule has:
@@ -38,7 +41,7 @@ const CORRELATION_RULES = [
     message: "A suspicious process in memory is communicating with an anomalous external IP — possible Command & Control (C2) activity.",
     weight:  50,
     test: (_, net, mem) =>
-      mem.some(m => m.type === "Suspicious Process") &&
+      mem.some(isSuspiciousMemory) &&
       net.some(n => /c2|beacon|tunnel|exfil|suspicious/i.test(JSON.stringify(n))),
   },
   {
@@ -48,7 +51,7 @@ const CORRELATION_RULES = [
     weight:  55,
     test: (_, __, mem, disk) =>
       disk.some(d => d.deleted) &&
-      mem.some(m => m.type === "Suspicious Process"),
+      mem.some(isSuspiciousMemory),
   },
   {
     agents:  ["log", "disk"],
@@ -75,7 +78,7 @@ const CORRELATION_RULES = [
     weight:  45,
     test: (log, _, mem) =>
       log.some(l => /privilege|escalat|root|sudo|admin/i.test(JSON.stringify(l))) &&
-      mem.some(m => m.type === "Suspicious Process"),
+      mem.some(isSuspiciousMemory),
   },
   {
     agents:  ["log", "network", "memory", "disk"],
@@ -150,7 +153,7 @@ function buildTimeline(logData, networkData, memoryData, diskData) {
         label:       findingLabel(item, name),
         detail:      item.line || item.detail || item.type || "",
         ip:          item.ip   || null,
-        severity:    item.deleted || item.type === "Suspicious Process" ? "HIGH" : "INFO",
+        severity:    item.deleted || item.type === "Suspicious Process" || (name === "Memory" && item.suspicious) ? "HIGH" : "INFO",
         raw:         item,
       });
     });
@@ -196,7 +199,7 @@ function computeRiskScore(logData, networkData, memoryData, diskData, patterns) 
 
   // Severity flags (max 20 pts)
   if (diskData.some(d => d.deleted))                     score += 10;
-  if (memoryData.some(m => m.type === "Suspicious Process")) score += 10;
+  if (memoryData.some(isSuspiciousMemory)) score += 10;
 
   // Pattern weights (capped at 70 pts total)
   const patternScore = patterns.reduce((acc, p) => acc + p.weight, 0);

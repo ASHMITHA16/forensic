@@ -69,8 +69,24 @@ _CANDIDATES = ("vol", "vol.py", "volatility3", "vol3")
 #: Volatility prints this in its help banner. Also our version source.
 _VERSION_RE = re.compile(r"Volatility\s+3\s+Framework\s+([0-9][0-9A-Za-z._-]*)")
 
-#: Plugin names as they appear in ``vol -h``.
-_PLUGIN_RE = re.compile(r"^\s{2,}(?P<name>[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)\b")
+#: Plugin names as they appear in ``vol -h`` -- ``windows.pslist.PsList``,
+#: ``banners.Banners``. MULTILINE: the help text is one blob, one plugin per line.
+_PLUGIN_RE = re.compile(r"^\s{2,}(?P<name>[a-z][a-z0-9_]*(?:\.[A-Za-z0-9_]+)+)\b", re.MULTILINE)
+
+
+def _plugin_names(help_text: str) -> tuple[str, ...]:
+    """
+    Every name a plugin can be invoked by: the full dotted name and, where
+    it ends in a class name, the module path alone. Vol3 accepts both, and
+    callers use both (``banners.Banners`` alongside ``windows.info``).
+    """
+    names: set[str] = set()
+    for full in _PLUGIN_RE.findall(help_text):
+        names.add(full)
+        module, _, cls = full.rpartition(".")
+        if cls[:1].isupper() and "." in module:
+            names.add(module)
+    return tuple(sorted(names))
 
 #: Beyond this, raw stdout is kept on disk but not parsed into memory.
 #: ``windows.filescan`` on a large image can emit hundreds of megabytes
@@ -322,7 +338,7 @@ class VolatilityRunner:
                 )
                 continue
 
-            plugins = tuple(sorted(set(_PLUGIN_RE.findall(blob))))
+            plugins = _plugin_names(blob)
             self._info = ToolchainInfo(
                 executable=argv[0],
                 argv_prefix=tuple(argv),

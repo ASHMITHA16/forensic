@@ -604,7 +604,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8_stdout() -> None:
+    """
+    Emit UTF-8 regardless of the console codepage.
+
+    On Windows a piped stdout defaults to cp1252, and strings recovered
+    from a real image (window titles, paths, command lines) routinely fall
+    outside it -- the envelope was computed and then lost at the final
+    print. ``backslashreplace`` turns a lone surrogate into ``\\udcXX``,
+    which is still a valid JSON escape.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdout()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

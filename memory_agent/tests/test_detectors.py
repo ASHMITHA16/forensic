@@ -178,12 +178,29 @@ class EngineTests(unittest.TestCase):
 class ProcessRuleTests(unittest.TestCase):
     def test_p001_fires_on_a_pool_only_process(self) -> None:
         findings, _, _ = run([process(
-            3999, "svch0st.exe",
+            3999, "svch0st.exe", handles=212,
             cross_view={"pslist": False, "psscan": True, "pstree": False,
                         "psxview": True},
+            psxview_flags={"pslist": False, "psscan": True,
+                           "thrdscan": True, "csrss": True},
         )], "MEM-P-001")
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].severity, "CRITICAL")
+        self.assertIn("+0.08", findings[0].confidence_basis)
+
+    def test_p001_discounts_a_freed_eprocess_seen_only_by_the_pool_scan(self) -> None:
+        # SearchFilterHost on case001: no threads, no csrss, no handle table
+        findings, _, _ = run([process(
+            8984, "SearchFilterHo", handles=None, threads=1,
+            cross_view={"pslist": False, "psscan": True, "pstree": False,
+                        "psxview": True},
+            psxview_flags={"pslist": False, "psscan": True,
+                           "thrdscan": False, "csrss": False},
+        )], "MEM-P-001")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].severity, "MEDIUM")
+        self.assertIn("-0.20", findings[0].confidence_basis)
+        self.assertIn("-0.15", findings[0].confidence_basis)
 
     def test_p001_stays_silent_when_pslist_did_not_run(self) -> None:
         # The single most important negative test in the suite.
@@ -341,12 +358,39 @@ class InjectionRuleTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_i002_fires_on_a_module_missing_from_every_peb_list(self) -> None:
-        findings, _, _ = run([obs(
-            "module", "OBS-MOD-0001", scope="user", pid=3200,
-            process="chrome.exe", name="wsock32.dll", base="0x7ffb12440000",
-            peb_lists={"in_load": False, "in_init": False, "in_mem": False},
-        )], "MEM-I-002")
+        findings, _, _ = run([
+            obs("module", "OBS-MOD-0001", scope="user", pid=3200,
+                process="chrome.exe", name="wsock32.dll", base="0x7ffb12440000",
+                peb_lists={"in_load": False, "in_init": False, "in_mem": False}),
+            obs("module", "OBS-MOD-0002", scope="user", pid=3200,
+                process="chrome.exe", name="ntdll.dll",
+                peb_lists={"in_load": True, "in_init": True, "in_mem": True}),
+        ], "MEM-I-002")
         self.assertEqual(len(findings), 1)
+
+    def test_i002_skips_a_process_whose_loader_lists_were_unreadable(self) -> None:
+        # Nothing in InLoadOrder at all: the PEB was paged out, not unlinked
+        findings, _, limitations = run([
+            obs("module", f"OBS-MOD-000{i}", scope="user", pid=764,
+                process="svchost.exe", name=name,
+                peb_lists={"in_load": False, "in_init": False, "in_mem": False})
+            for i, name in enumerate(("ntdll.dll", "combase.dll"), start=1)
+        ], "MEM-I-002")
+        self.assertEqual(findings, [])
+        self.assertTrue(any("MEM-I-002 was not evaluated" in l and "PID 764" in l
+                            for l in limitations))
+
+    def test_i002_silent_on_a_resource_file_mapped_as_data(self) -> None:
+        findings, _, _ = run([
+            obs("module", "OBS-MOD-0001", scope="user", pid=616,
+                process="services.exe", name="services.exe.mui",
+                mapped_path="\\Windows\\System32\\en-US\\services.exe.mui",
+                peb_lists={"in_load": False, "in_init": False, "in_mem": False}),
+            obs("module", "OBS-MOD-0002", scope="user", pid=616,
+                process="services.exe", name="ntdll.dll",
+                peb_lists={"in_load": True, "in_init": True, "in_mem": True}),
+        ], "MEM-I-002")
+        self.assertEqual(findings, [])
 
     def test_i002_silent_on_a_fully_linked_module(self) -> None:
         findings, _, _ = run([obs(
@@ -571,6 +615,31 @@ class ModuleServiceRuleTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].severity, "CRITICAL")
 
+    def test_m001_sets_aside_pool_carvings_that_cannot_be_kernel_images(self) -> None:
+        carved = [
+            ("OBS-MOD-0001", None, "0x0"),                  # no name, null base
+            ("OBS-MOD-0002", "ԁ", "0xcf0484185980"),  # junk name
+            ("OBS-MOD-0003", "evil.sys", "0x7ffd72638360"),  # user-space base
+        ]
+        findings, _, limitations = run([
+            obs("module", obs_id, scope="kernel", name=name, base=base,
+                cross_view={"modules": False, "modscan": True})
+            for obs_id, name, base in carved
+        ], "MEM-M-001")
+        self.assertEqual(findings, [])
+        self.assertTrue(any("set aside 3" in l for l in limitations))
+
+    def test_m001_accepts_canonical_and_sign_stripped_kernel_bases(self) -> None:
+        findings, _, _ = run([
+            obs("module", "OBS-MOD-0001", scope="kernel", name="a.sys",
+                base="0xfffff8026a140000",
+                cross_view={"modules": False, "modscan": True}),
+            obs("module", "OBS-MOD-0002", scope="kernel", name="b.sys",
+                base="0xf8026a150000",
+                cross_view={"modules": False, "modscan": True}),
+        ], "MEM-M-001")
+        self.assertEqual(len(findings), 2)
+
     def test_m001_silent_when_the_module_list_did_not_run(self) -> None:
         findings, _, _ = run([obs(
             "module", "OBS-MOD-0001", scope="kernel", name="np_flt.sys",
@@ -616,6 +685,33 @@ class ModuleServiceRuleTests(unittest.TestCase):
                          "C:\\Windows\\System32\\svchost.exe"),
         ], "MEM-S-001")
         self.assertEqual(findings, [])
+
+    def test_s001_reports_a_service_carved_several_times_once(self) -> None:
+        findings, _, _ = run([
+            self.service(f"OBS-SVC-000{i}", "C:\\Users\\Public\\upd.exe")
+            for i in range(1, 4)
+        ], "MEM-S-001")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(
+            findings[0].observation_refs,
+            ["OBS-SVC-0001", "OBS-SVC-0002", "OBS-SVC-0003"],
+        )
+
+    def test_s001_silent_on_the_defender_platform_directory(self) -> None:
+        findings, _, _ = run([self.service(
+            "OBS-SVC-0001",
+            "\"C:\\ProgramData\\Microsoft\\Windows Defender\\platform\\"
+            "4.18.2009.2-0\\MsMpEng.exe\"",
+            name="WinDefend",
+        )], "MEM-S-001")
+        self.assertEqual(findings, [])
+
+    def test_s001_still_fires_elsewhere_under_programdata(self) -> None:
+        findings, _, _ = run(
+            [self.service("OBS-SVC-0001", "C:\\ProgramData\\Updater\\upd.exe")],
+            "MEM-S-001",
+        )
+        self.assertEqual(len(findings), 1)
 
     def test_s001_declines_to_judge_an_unexpandable_path(self) -> None:
         findings, _, _ = run(

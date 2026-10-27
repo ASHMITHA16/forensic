@@ -23,3 +23,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Memory agent case workspaces (envelopes, audit trails, raw plugin output)
+backend/memory_cases/

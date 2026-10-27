@@ -120,6 +120,9 @@ class DetectionContext:
     ) -> None:
         self.observations = list(observations)
         self.environment = environment or {}
+        #: Coverage gaps a rule found while evaluating (e.g. a process whose
+        #: loader lists were unreadable). Surfaced as envelope limitations.
+        self.rule_notes: list[str] = []
         self.by_id: dict[str, Observation] = {o.obs_id: o for o in observations}
 
         self.by_type: dict[str, list[Observation]] = {}
@@ -264,6 +267,7 @@ class RuleEngine:
                 audit.record("rule.evaluated", rule_id=rule.rule_id,
                              hits=len(hits))
 
+        limitations.extend(context.rule_notes)
         findings = self._finalise(staged, ids)
         return findings, outcomes, limitations
 

@@ -455,6 +455,9 @@ vol -f /path/to/dump.raw windows.info
 
 Windows symbol tables are downloaded automatically from Microsoft's symbol
 server on first use, so no manual symbol setup is needed for Windows dumps.
+The first run against a new kernel build therefore needs internet access and
+spends a minute or two in `windows.info` converting the PDB; the result is
+cached under `volatility3/symbols/windows/` and later runs skip it.
 Linux dumps require an ISF file matching the exact kernel build — the usual
 place demos fail, which is why Phase 1 targets Windows first.
 
@@ -479,6 +482,32 @@ Two good free sources:
 
 Older XP/Win7 samples still work with Volatility 3 and are far quicker to
 iterate on than a modern 16 GB Windows 11 dump.
+
+For a modern target, **[DFIR Madness case001, "The Stolen Szechuan
+Sauce"](https://dfirmadness.com/the-stolen-szechuan-sauce/)** ships a 2 GB
+Windows 10 desktop image (`DESKTOP-SDN1RPT-memory.zip`, MD5
+`CF31E2635C77811AAA1BB04A92A721E2`) with a published answer key. The agent
+completes it in about nine minutes with every plugin and rule evaluated, and
+ranks the injected `spoolsv.exe` (PID 2188) first.
+
+### From the web UI
+
+The Node backend (`backend/agents/memoryAgent.js`) runs this package as a
+child process and the Memory Agent page polls it as a background job, so a
+multi-hour analysis is not cut off by an HTTP timeout. The page shows the
+current stage and plugin as the agent records them in `audit.jsonl`.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PYTHON_BIN` | `python` | Interpreter used to run `python -m memory_agent` |
+| `VOLATILITY_BIN` | `vol` on `PATH` | Volatility 3 executable, read by the agent itself |
+| `MEMORY_CASES_DIR` | `backend/memory_cases` | Where case workspaces are written |
+| `MEMORY_PLUGIN_TIMEOUT_S` | agent default (300) | Base per-plugin budget; raise it for very large images |
+| `MAX_UPLOAD_BYTES` | 32 GB | Upload ceiling for dumps and disk images |
+
+The full envelope stays in the case workspace and can be downloaded from the
+results page; the page itself shows the findings, the first 300 IOCs and up to
+500 timestamped timeline events.
 
 ### Test without any dump at all
 
