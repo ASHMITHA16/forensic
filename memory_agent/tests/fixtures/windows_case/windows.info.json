@@ -1,0 +1,66 @@
+[
+  {
+    "Variable": "Kernel Base",
+    "Value": "0xf80267a00000"
+  },
+  {
+    "Variable": "DTB",
+    "Value": "0x1aa000"
+  },
+  {
+    "Variable": "Is64Bit",
+    "Value": true
+  },
+  {
+    "Variable": "IsPAE",
+    "Value": false
+  },
+  {
+    "Variable": "primary",
+    "Value": "0 WindowsIntel32e"
+  },
+  {
+    "Variable": "memory_layer",
+    "Value": "1 FileLayer"
+  },
+  {
+    "Variable": "KdVersionBlock",
+    "Value": "0xf80267c2b3b0"
+  },
+  {
+    "Variable": "Major/Minor",
+    "Value": "15.19041"
+  },
+  {
+    "Variable": "MachineType",
+    "Value": "34404"
+  },
+  {
+    "Variable": "KeNumberProcessors",
+    "Value": "4"
+  },
+  {
+    "Variable": "SystemTime",
+    "Value": "2026-04-12 02:22:11"
+  },
+  {
+    "Variable": "NtSystemRoot",
+    "Value": "C:\\Windows"
+  },
+  {
+    "Variable": "NtProductType",
+    "Value": "NtProductWinNt"
+  },
+  {
+    "Variable": "NtMajorVersion",
+    "Value": 10
+  },
+  {
+    "Variable": "NtMinorVersion",
+    "Value": 0
+  },
+  {
+    "Variable": "NTBuildLab",
+    "Value": "19041.1.amd64fre.vb_release.191206-1406"
+  }
+]

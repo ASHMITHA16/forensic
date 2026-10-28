@@ -1,0 +1,38 @@
+[
+  {
+    "Offset": "0x9d100000",
+    "Order": 12,
+    "PID": 812,
+    "Start": "SERVICE_AUTO_START",
+    "State": "SERVICE_RUNNING",
+    "Type": "SERVICE_WIN32_SHARE_PROCESS",
+    "Name": "Dnscache",
+    "Display": "DNS Client",
+    "Binary": "C:\\Windows\\system32\\svchost.exe -k NetworkService",
+    "Binary (Registry)": "%SystemRoot%\\system32\\svchost.exe -k NetworkService"
+  },
+  {
+    "Offset": "0x9d100400",
+    "Order": 88,
+    "PID": null,
+    "Start": "SERVICE_AUTO_START",
+    "State": "SERVICE_STOPPED",
+    "Type": "SERVICE_WIN32_OWN_PROCESS",
+    "Name": "UpdaterSvc",
+    "Display": "System Update Helper",
+    "Binary": "C:\\Users\\Public\\upd.exe",
+    "Binary (Registry)": "C:\\Users\\Public\\upd.exe"
+  },
+  {
+    "Offset": "0x9d100800",
+    "Order": 91,
+    "PID": null,
+    "Start": "SERVICE_DEMAND_START",
+    "State": "SERVICE_STOPPED",
+    "Type": "SERVICE_WIN32_OWN_PROCESS",
+    "Name": "VendorAgent",
+    "Display": "Vendor Agent",
+    "Binary": "%ProgramFiles%\\Vendor\\agent.exe",
+    "Binary (Registry)": "%ProgramFiles%\\Vendor\\agent.exe"
+  }
+]

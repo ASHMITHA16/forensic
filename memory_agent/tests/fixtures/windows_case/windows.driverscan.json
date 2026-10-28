@@ -1,0 +1,10 @@
+[
+  {
+    "Offset": "0x9c2a1080",
+    "Start": "0xf80268500000",
+    "Size": 2883584,
+    "Service Key": "Tcpip",
+    "Driver Name": "\\Driver\\Tcpip",
+    "Name": "Tcpip"
+  }
+]

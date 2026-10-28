@@ -1,0 +1,102 @@
+[
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ff6a0000000",
+    "Size": 126976,
+    "Name": "chrome.exe",
+    "Path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ffb12340000",
+    "Size": 126976,
+    "Name": "ntdll.dll",
+    "Path": "C:\\Windows\\System32\\ntdll.dll",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ffb12440000",
+    "Size": 126976,
+    "Name": "wsock32.dll",
+    "Path": "C:\\Windows\\System32\\wsock32.dll",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 2456,
+    "Process": "data_transfer.exe",
+    "Base": "0x400000",
+    "Size": 126976,
+    "Name": "data_transfer.exe",
+    "Path": "C:\\Users\\jdoe\\AppData\\Local\\Temp\\data_transfer.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 2456,
+    "Process": "data_transfer.exe",
+    "Base": "0x7ffb12340000",
+    "Size": 126976,
+    "Name": "ntdll.dll",
+    "Path": "C:\\Windows\\System32\\ntdll.dll",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 4100,
+    "Process": "lsass.exe",
+    "Base": "0x400000",
+    "Size": 126976,
+    "Name": "lsass.exe",
+    "Path": "C:\\Users\\jdoe\\AppData\\Local\\Temp\\lsass.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 632,
+    "Process": "lsass.exe",
+    "Base": "0x7ff77a000000",
+    "Size": 126976,
+    "Name": "lsass.exe",
+    "Path": "C:\\Windows\\System32\\lsass.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 464,
+    "Process": "csrss.exe",
+    "Base": "0x7ff77b000000",
+    "Size": 126976,
+    "Name": "csrss.exe",
+    "Path": "C:\\Windows\\System32\\csrss.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "Base": "0x7ff77c000000",
+    "Size": 126976,
+    "Name": "powershell.exe",
+    "Path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  },
+  {
+    "PID": 3600,
+    "Process": "stage2.exe",
+    "Base": "0x400000",
+    "Size": 126976,
+    "Name": "stage2.exe",
+    "Path": "C:\\Users\\jdoe\\AppData\\Roaming\\stage2.exe",
+    "LoadTime": "2026-04-11 21:07:44.000000 +0000",
+    "File output": "Disabled"
+  }
+]

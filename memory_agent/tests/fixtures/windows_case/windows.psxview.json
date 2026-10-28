@@ -1,0 +1,122 @@
+[
+  {
+    "Name": "System",
+    "PID": 4,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "smss.exe",
+    "PID": 376,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "csrss.exe",
+    "PID": 464,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "wininit.exe",
+    "PID": 536,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "services.exe",
+    "PID": 624,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "lsass.exe",
+    "PID": 632,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "svchost.exe",
+    "PID": 812,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "explorer.exe",
+    "PID": 2100,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "chrome.exe",
+    "PID": 3200,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "data_transfer.exe",
+    "PID": 2456,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "powershell.exe",
+    "PID": 2800,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "stage2.exe",
+    "PID": 3600,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "lsass.exe",
+    "PID": 4100,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "uploader.exe",
+    "PID": 3050,
+    "pslist": true,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": true
+  },
+  {
+    "Name": "svch0st.exe",
+    "PID": 3999,
+    "pslist": false,
+    "psscan": true,
+    "thrdscan": true,
+    "csrss": false
+  }
+]

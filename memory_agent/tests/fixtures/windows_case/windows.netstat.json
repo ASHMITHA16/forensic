@@ -1,0 +1,62 @@
+[
+  {
+    "Offset": 2601517056,
+    "Proto": "TCPv4",
+    "LocalAddr": "10.0.2.15",
+    "LocalPort": 51234,
+    "ForeignAddr": "185.77.22.90",
+    "ForeignPort": 4444,
+    "State": "ESTABLISHED",
+    "PID": 2456,
+    "Owner": "data_transfer.exe",
+    "Created": "2026-04-12 02:18:09.000000 +0000"
+  },
+  {
+    "Offset": 2601518080,
+    "Proto": "TCPv4",
+    "LocalAddr": "0.0.0.0",
+    "LocalPort": 1337,
+    "ForeignAddr": "*",
+    "ForeignPort": 0,
+    "State": "LISTENING",
+    "PID": 2456,
+    "Owner": "data_transfer.exe",
+    "Created": "2026-04-12 02:18:11.000000 +0000"
+  },
+  {
+    "Offset": 2601519104,
+    "Proto": "TCPv4",
+    "LocalAddr": "10.0.2.15",
+    "LocalPort": 51190,
+    "ForeignAddr": "142.250.72.196",
+    "ForeignPort": 443,
+    "State": "ESTABLISHED",
+    "PID": 3200,
+    "Owner": "chrome.exe",
+    "Created": "2026-04-11 21:08:02.000000 +0000"
+  },
+  {
+    "Offset": 2601520128,
+    "Proto": "TCPv4",
+    "LocalAddr": "127.0.0.1",
+    "LocalPort": 49670,
+    "ForeignAddr": "127.0.0.1",
+    "ForeignPort": 49671,
+    "State": "ESTABLISHED",
+    "PID": 812,
+    "Owner": "svchost.exe",
+    "Created": "2026-04-11 21:03:40.000000 +0000"
+  },
+  {
+    "Offset": 2601522176,
+    "Proto": "TCPv4",
+    "LocalAddr": "0.0.0.0",
+    "LocalPort": 445,
+    "ForeignAddr": "*",
+    "ForeignPort": 0,
+    "State": "LISTENING",
+    "PID": 4,
+    "Owner": "System",
+    "Created": "2026-04-11 21:03:20.000000 +0000"
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "CommandHistoryOffset": "0x1f2a40",
+    "LastAdded": 6,
+    "Cmd": "whoami /priv"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "CommandHistoryOffset": "0x1f2a40",
+    "LastAdded": 6,
+    "Cmd": "net user /domain"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "CommandHistoryOffset": "0x1f2a40",
+    "LastAdded": 6,
+    "Cmd": "ipconfig /all"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "CommandHistoryOffset": "0x1f2a40",
+    "LastAdded": 6,
+    "Cmd": "systeminfo"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "CommandHistoryOffset": "0x1f2a40",
+    "LastAdded": 6,
+    "Cmd": "nltest /dclist:corp"
+  }
+]

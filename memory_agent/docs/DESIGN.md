@@ -375,3 +375,111 @@ Each phase ends with runnable code and a test you can execute. Phases 3–5 are 
 
 1. **Section 1.2 (Problem Statement)** currently contains text about Gen Z consumer purchasing habits and sustainable fashion — clearly a paste from a different document. It should state the digital forensics problem.
 2. **Section 3.4** ("Memory Analysis Findings") is mis-nested: "3.4.1 Network Analysis Agent Results" appears as its subsection. It should be 3.3.5 and 3.3.6 respectively, consistent with the other agent-level results.
+
+---
+
+## 8. Implementation notes — where the build departs from this design
+
+All six phases are implemented. This section records every place the delivered
+code deliberately differs from the design above, and why. A design document that
+quietly diverges from its implementation is worse than no design document.
+
+### 8.1 No Pydantic — `core/schema.py` validates by hand
+
+Section 1.4 named Pydantic for the schema layer. The build keeps the package at
+**zero third-party dependencies** instead, with hand-written validators.
+
+The cost is roughly 200 lines of explicit checks. The benefit is that the agent
+runs on a bare Python install — in a locked-down evidence-handling environment,
+on a grader's machine, in any Python 3.10+ interpreter — and "does it run here?"
+is never a question. For a tool whose whole value proposition is defensibility,
+removing an installation step that could fail is worth more than the brevity.
+
+Two rules are enforced that a type checker would not have caught anyway:
+observations may not carry judgement fields, and `alternative_explanations` may
+not be empty.
+
+### 8.2 Reproducibility is scoped, and the scope is a function
+
+Section 1.1 claimed "same dump + same rule-pack version ⇒ byte-identical output".
+Taken literally that is false: the envelope carries a `run_id`, wall-clock
+timestamps and per-plugin durations, none of which can or should be identical
+between runs.
+
+The delivered claim is narrower and checkable: `report.deterministic_core()`
+strips what legitimately varies and returns the analysis itself, and
+`report.core_digest()` reduces it to a single SHA-256.
+`tests/test_pipeline.py::ReproducibilityTests` runs the pipeline twice and
+asserts the digests match. Identifier allocation was made order-independent
+(records are sorted before ids are assigned) so that two envelopes can be
+diffed directly.
+
+### 8.3 Cross-view fields are tri-state, not boolean
+
+The design's observation example shows `cross_view` as booleans. Implementation
+showed that to be unsafe. "Absent from `pslist`" is a hidden-process indicator
+only when `pslist` actually ran; when it timed out, absence establishes nothing.
+
+Every cross-view field is therefore `true` / `false` / `null`, where `null` means
+"the source did not run". Rules test `is False` explicitly. Without this, a slow
+`pslist` on a large image would produce a CRITICAL MEM-P-001 finding for every
+process on a healthy machine.
+
+### 8.4 MEM-I-001 fires below the design's threshold, and prices the signal
+
+The design specified MEM-I-001 as "private VAD, PAGE_EXECUTE_READWRITE, `MZ`
+header" at base confidence 0.75. The build fires on private-and-executable at
+base 0.45 and adds the other two components as stated adjustments (+0.15 for
+writable-and-executable, +0.20 for the `MZ` header), subtracting 0.25 for a known
+JIT host process.
+
+The reason is that the original formulation would miss shellcode, which has no
+`MZ` header and is the more common case, while the JIT problem it was implicitly
+guarding against is better handled by a visible, arguable adjustment than by a
+silent threshold.
+
+### 8.5 MEM-N-003 does not include port 443
+
+The design's rule text listed "4444/1337/8080/9001". The build also considered
+443 and rejected it: a rule keyed on HTTPS emits one finding per browser tab on
+a clean machine. A rule that fires hundreds of times on a healthy image is not a
+weak rule, it is a broken one — the analyst filters the rule out and the one real
+hit goes with it.
+
+### 8.6 `replay` — a mode the design did not anticipate
+
+`python -m memory_agent replay <raw-dir>` runs stages S4–S8 against captured
+plugin output. It exists because the design's own observation — that Tiers 2 and
+3 are testable without a dump — turned out to be worth making a first-class
+command rather than only a test fixture. It also lets a closed case be
+re-analysed under a newer rule pack without touching the evidence again.
+
+A replayed envelope is always stamped `INVALID`: no evidence was sealed, so
+nothing in it is admissible.
+
+### 8.7 The post-analysis re-read is mandatory in `analyze`
+
+As anticipated in Phase 1's notes. `verify` still defaults to `seal_only`
+because nothing happens between sealing and checking. `analyze` always re-reads:
+an external tool has just been pointed at the evidence twenty times, and
+confirming the file is byte-identical afterwards is the entire basis for
+claiming the analysis did not alter it.
+
+### 8.8 Column names are read tolerantly, and gaps are reported
+
+Not in the design at all, and it turned out to matter. Volatility's JSON keys are
+display column names, not an API: the same value has shipped as `PID` / `Pid`,
+`ImageFileName` / `Process`, `NTBuildLab` / `NtBuildLab`. Every field is read
+through a normalised-key lookup that accepts every spelling the extractor knows
+about, and any column no extractor consumed is reported in `limitations`.
+
+Without this, a routine `pip install -U volatility3` produces empty observations
+and therefore no findings — which is indistinguishable, in the output, from a
+clean machine.
+
+### 8.9 Linux is planned but not normalised
+
+The planner has a real Linux plugin plan and will execute it, retaining the raw
+output. There are no Linux extractors, so no observations, findings, timeline or
+IOCs are derived, and the envelope states this rather than emitting an empty
+analysis. macOS is refused outright by `build_plan`.

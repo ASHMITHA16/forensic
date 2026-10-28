@@ -1,0 +1,47 @@
+[
+  {
+    "Pid": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ff6a0000000",
+    "InLoad": true,
+    "InInit": false,
+    "InMem": true,
+    "MappedPath": "\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+  },
+  {
+    "Pid": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ffb12340000",
+    "InLoad": true,
+    "InInit": true,
+    "InMem": true,
+    "MappedPath": "\\Windows\\System32\\ntdll.dll"
+  },
+  {
+    "Pid": 3200,
+    "Process": "chrome.exe",
+    "Base": "0x7ffb12440000",
+    "InLoad": false,
+    "InInit": false,
+    "InMem": false,
+    "MappedPath": "\\Windows\\System32\\wsock32.dll"
+  },
+  {
+    "Pid": 2456,
+    "Process": "data_transfer.exe",
+    "Base": "0x400000",
+    "InLoad": true,
+    "InInit": false,
+    "InMem": true,
+    "MappedPath": "\\Users\\jdoe\\AppData\\Local\\Temp\\data_transfer.exe"
+  },
+  {
+    "Pid": 2456,
+    "Process": "data_transfer.exe",
+    "Base": "0x7ffb12340000",
+    "InLoad": true,
+    "InInit": true,
+    "InMem": true,
+    "MappedPath": "\\Windows\\System32\\ntdll.dll"
+  }
+]

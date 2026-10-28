@@ -1,0 +1,10 @@
+[
+  {
+    "PID": 3600,
+    "Process": "stage2.exe",
+    "Base": "0x400000",
+    "Process Path": "C:\\Users\\jdoe\\AppData\\Roaming\\stage2.exe",
+    "VAD Path": "C:\\Windows\\System32\\svchost.exe",
+    "Notes": "Image path and VAD backing file differ"
+  }
+]

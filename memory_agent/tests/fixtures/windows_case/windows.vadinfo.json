@@ -1,0 +1,24 @@
+[
+  {
+    "PID": 2456,
+    "Process": "data_transfer.exe",
+    "Start VPN": "0x2a0000",
+    "End VPN": "0x2affff",
+    "Tag": "VadS",
+    "Protection": "PAGE_EXECUTE_READWRITE",
+    "CommitCharge": 16,
+    "PrivateMemory": 1,
+    "File": null
+  },
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Start VPN": "0x1c40000",
+    "End VPN": "0x1c4ffff",
+    "Tag": "VadS",
+    "Protection": "PAGE_EXECUTE_READWRITE",
+    "CommitCharge": 16,
+    "PrivateMemory": 1,
+    "File": null
+  }
+]

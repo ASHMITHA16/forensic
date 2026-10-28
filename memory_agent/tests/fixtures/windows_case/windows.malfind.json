@@ -1,0 +1,30 @@
+[
+  {
+    "PID": 2456,
+    "Process": "data_transfer.exe",
+    "Start VPN": "0x2a0000",
+    "End VPN": "0x2affff",
+    "Tag": "VadS",
+    "Protection": "PAGE_EXECUTE_READWRITE",
+    "CommitCharge": 16,
+    "PrivateMemory": 1,
+    "File output": "Disabled",
+    "Notes": "MZ header",
+    "Hexdump": "0x2a0000  4d 5a 90 00 03 00 00 00  04 00 00 00 ff ff 00 00   MZ..............\n0x2a0010  b8 00 00 00 00 00 00 00  40 00 00 00 00 00 00 00   ........@.......",
+    "Disasm": "0x2a0000: dec ebp\\n0x2a0001: pop edx"
+  },
+  {
+    "PID": 3200,
+    "Process": "chrome.exe",
+    "Start VPN": "0x1c40000",
+    "End VPN": "0x1c4ffff",
+    "Tag": "VadS",
+    "Protection": "PAGE_EXECUTE_READWRITE",
+    "CommitCharge": 16,
+    "PrivateMemory": 1,
+    "File output": "Disabled",
+    "Notes": "",
+    "Hexdump": "0x1c40000  55 8b ec 83 e4 f8 83 ec  1c 53 56 57 8b 7d 08 8b   U........SVW.}..\n0x1c40010  45 0c 89 45 f4 8b 4d 10  89 4d f0 8b 55 14 89 55   E..E..M..M..U..U",
+    "Disasm": "0x1c40000: push ebp"
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "Offset": "0xf80267a00000",
+    "Name": "ntoskrnl.exe",
+    "Base": "0xf80267a00000",
+    "Size": 10289152,
+    "File output": "Disabled"
+  },
+  {
+    "Offset": "0xf80268500000",
+    "Name": "tcpip.sys",
+    "Base": "0xf80268500000",
+    "Size": 2883584,
+    "File output": "Disabled"
+  },
+  {
+    "Offset": "0xf80268900000",
+    "Name": "ndis.sys",
+    "Base": "0xf80268900000",
+    "Size": 1114112,
+    "File output": "Disabled"
+  }
+]
