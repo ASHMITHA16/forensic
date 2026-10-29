@@ -7,6 +7,7 @@ const AGENT_ICONS = {
   log: "📊",
   memory: "🧠",
   network: "🌐",
+  correlation: "🔗",
 };
 
 const riskLabel = {
@@ -38,6 +39,12 @@ const History = () => {
   }, []);
 
   const handleRowClick = (item) => {
+    // Correlation runs have their own page, which loads the saved envelope by id
+    if (item.agent === "correlation") {
+      navigate("/agent/correlation", { state: { analysisId: item._id } });
+      return;
+    }
+
     sessionStorage.setItem(
       `result_${item.agent}`,
       JSON.stringify(item.results)

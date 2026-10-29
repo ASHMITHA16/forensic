@@ -1,0 +1,12 @@
+[
+  { "type": "Suspicious Executable", "category": "Suspicious File", "severity": "high", "filePath": "Users/jdoe/AppData/Roaming/stage2.exe", "fileName": "stage2.exe", "ext": ".exe", "deleted": false, "suspicious": true, "timestamp": null,
+    "explanation": "Executable/script \"stage2.exe\" found outside standard system directories. May be malware or a dropped payload." },
+  { "type": "Deleted File", "category": "File System Artifact", "severity": "high", "filePath": "Users/jdoe/AppData/Local/Temp/data_transfer.exe", "fileName": "data_transfer.exe", "ext": ".exe", "deleted": true, "suspicious": true, "timestamp": null,
+    "explanation": "Deleted executable/script \"data_transfer.exe\" found — attacker may have removed evidence." },
+  { "type": "Suspicious Executable", "category": "Suspicious File", "severity": "high", "filePath": "Users/Public/upd.exe", "fileName": "upd.exe", "ext": ".exe", "deleted": false, "suspicious": true, "timestamp": null,
+    "explanation": "Executable/script \"upd.exe\" found outside standard system directories. May be malware or a dropped payload." },
+  { "type": "Known Attacker Tool", "category": "Malicious Executable", "severity": "critical", "filePath": "Users/jdoe/Downloads/mimikatz.exe", "fileName": "mimikatz.exe", "ext": ".exe", "deleted": false, "suspicious": true, "timestamp": null,
+    "explanation": "\"mimikatz.exe\" matches a known attacker tool pattern. Immediate investigation required." },
+  { "type": "Deleted File", "category": "File System Artifact", "severity": "medium", "filePath": "Users/jdoe/Documents/notes.txt", "fileName": "notes.txt", "ext": ".txt", "deleted": true, "suspicious": false, "timestamp": null,
+    "explanation": "Deleted file \"notes.txt\" found. Recovery may reveal additional evidence." }
+]

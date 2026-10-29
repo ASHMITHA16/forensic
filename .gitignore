@@ -26,3 +26,10 @@ Thumbs.db
 
 # Memory agent case workspaces (envelopes, audit trails, raw plugin output)
 backend/memory_cases/
+
+# Correlation agent case workspaces (input + full envelope per run)
+backend/correlation_cases/
+
+# Python bytecode
+__pycache__/
+*.pyc

@@ -1,307 +1,133 @@
 /**
  * correlationAgent.js
  * ─────────────────────────────────────────────────────────────
- * Receives outputs from all four analysis agents, cross-references
- * every finding, builds a unified event timeline, detects suspicious
- * patterns, and calculates an overall risk level + confidence score.
+ * Bridge to the Python correlation & reasoning agent in
+ * ../correlation_agent (see correlation_agent/docs/DESIGN.md).
+ *
+ * correlate : runs `python -m correlation_agent correlate` on the
+ *             outputs of the log / network / memory / disk agents
+ * demo      : bundled demo case (memory replay + captured agent output)
+ * rules     : the rule pack, for review
+ *
+ * The payload goes to the agent on stdin; the agent writes the full
+ * envelope to a case workspace and prints a compact copy (cited evidence
+ * only) that is small enough for History.
  * ─────────────────────────────────────────────────────────────
  */
 
-"use strict";
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// ─── Constants ────────────────────────────────────────────────
+const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT   = path.resolve(BACKEND_DIR, "..");
 
-const RISK = { LOW: "LOW", MEDIUM: "MEDIUM", HIGH: "HIGH" };
+// Override with env variables if Python / the case store live elsewhere
+const PYTHON_BIN = process.env.PYTHON_BIN || "python";
+const CASES_DIR  = path.resolve(process.env.CORRELATION_CASES_DIR || path.join(BACKEND_DIR, "correlation_cases"));
 
-// Legacy memory items use type "Suspicious Process"; the Python memory agent flags `suspicious`
-const isSuspiciousMemory = (m) => m.type === "Suspicious Process" || m.suspicious === true;
+// Exit codes documented in correlation_agent/cli.py
+const EXIT_CONTRACT = 2;
 
-/**
- * Known-bad patterns we look for when cross-referencing agents.
- * Each rule has:
- *   agents   – which agents must both have a hit for this pattern to fire
- *   test     – predicate(logData, networkData, memoryData, diskData) → bool
- *   type     – short label surfaced in the output
- *   message  – human-readable description
- *   weight   – how much this pattern adds to the risk score (0-100)
- */
-const CORRELATION_RULES = [
-  {
-    agents:  ["log", "network"],
-    type:    "Brute Force + Port Scan",
-    message: "Log entries show repeated failed authentication while network data reveals active port scanning — consistent with a credential-stuffing campaign.",
-    weight:  40,
-    test: (log, net) =>
-      log.some(l => /brute|fail|invalid|unauthorized/i.test(JSON.stringify(l))) &&
-      net.some(n => /scan|sweep|probe/i.test(JSON.stringify(n))),
-  },
-  {
-    agents:  ["memory", "network"],
-    type:    "C2 Beacon Detected",
-    message: "A suspicious process in memory is communicating with an anomalous external IP — possible Command & Control (C2) activity.",
-    weight:  50,
-    test: (_, net, mem) =>
-      mem.some(isSuspiciousMemory) &&
-      net.some(n => /c2|beacon|tunnel|exfil|suspicious/i.test(JSON.stringify(n))),
-  },
-  {
-    agents:  ["disk", "memory"],
-    type:    "Malware Persistence",
-    message: "A deleted or hidden file on disk correlates with an active suspicious process in memory — likely malware establishing persistence.",
-    weight:  55,
-    test: (_, __, mem, disk) =>
-      disk.some(d => d.deleted) &&
-      mem.some(isSuspiciousMemory),
-  },
-  {
-    agents:  ["log", "disk"],
-    type:    "Log Tampering + File Deletion",
-    message: "Log events indicate modification of system logs while disk analysis found deleted files — suggests an attacker covering their tracks.",
-    weight:  45,
-    test: (log, _, __, disk) =>
-      log.some(l => /tamper|modify|clear|wipe|erase/i.test(JSON.stringify(l))) &&
-      disk.some(d => d.deleted),
-  },
-  {
-    agents:  ["network", "disk"],
-    type:    "Data Exfiltration Attempt",
-    message: "Unusual outbound network connections coincide with file-system artifacts — possible data exfiltration in progress.",
-    weight:  50,
-    test: (_, net, __, disk) =>
-      net.some(n => /exfil|upload|outbound|transfer/i.test(JSON.stringify(n))) &&
-      disk.length > 0,
-  },
-  {
-    agents:  ["log", "memory"],
-    type:    "Privilege Escalation",
-    message: "Log entries show privilege escalation attempts correlated with a suspicious process running at elevated context.",
-    weight:  45,
-    test: (log, _, mem) =>
-      log.some(l => /privilege|escalat|root|sudo|admin/i.test(JSON.stringify(l))) &&
-      mem.some(isSuspiciousMemory),
-  },
-  {
-    agents:  ["log", "network", "memory", "disk"],
-    type:    "Full Compromise Indicator",
-    message: "Findings across ALL four agents are consistent with a full system compromise: intrusion, lateral movement, persistence, and exfiltration.",
-    weight:  80,
-    test: (log, net, mem, disk) =>
-      log.length > 0 && net.length > 0 && mem.length > 0 && disk.length > 0,
-  },
-];
-
-// ─── Helpers ──────────────────────────────────────────────────
-
-/**
- * Safely stringify any value for pattern matching.
- */
-function safeStr(v) {
-  try { return JSON.stringify(v).toLowerCase(); } catch { return ""; }
-}
-
-/**
- * Extract the most meaningful "label" from a heterogeneous finding.
- */
-function findingLabel(item, source) {
-  const s = source.toLowerCase();
-  if (s === "log")     return item.type  || item.line || "Log event";
-  if (s === "network") return item.type  || item.detail || "Network event";
-  if (s === "memory")  return `${item.type || "Memory event"} — ${item.process || ""}`;
-  if (s === "disk")    return item.fileName || item.name || item.file || "Disk artifact";
-  return "Finding";
-}
-
-/**
- * Assign a relative timestamp offset so every finding gets a
- * plausible position in the unified timeline (real timestamps come
- * from the actual data when available).
- */
-function extractTimestamp(item) {
-  // Prefer any real timestamp the agent already embedded
-  const candidates = ["timestamp", "time", "date", "ts", "datetime", "at"];
-  for (const key of candidates) {
-    if (item[key]) return new Date(item[key]);
+class CorrelationAgentError extends Error {
+  constructor(message, { code = null, status = 500 } = {}) {
+    super(message);
+    this.code = code;
+    this.status = status;
   }
-  return null; // will be assigned a synthetic offset later
 }
 
-/**
- * Build a flat list of timeline events from all agent outputs.
- * Events without real timestamps are ordered after real ones,
- * grouped by agent in collection order.
- */
-function buildTimeline(logData, networkData, memoryData, diskData) {
-  const allEvents = [];
-  const baseTime = new Date();
-
-  const sources = [
-    { name: "Log",     icon: "📊", data: logData,     offsetBase: -120 },
-    { name: "Network", icon: "🌐", data: networkData,  offsetBase: -90  },
-    { name: "Disk",    icon: "💾", data: diskData,     offsetBase: -60  },
-    { name: "Memory",  icon: "🧠", data: memoryData,   offsetBase: -30  },
-  ];
-
-  sources.forEach(({ name, icon, data, offsetBase }) => {
-    if (!Array.isArray(data)) return;
-    data.forEach((item, idx) => {
-      const real = extractTimestamp(item);
-      const ts = real || new Date(baseTime.getTime() + (offsetBase + idx * 5) * 1000);
-      allEvents.push({
-        timestamp:   ts.toISOString(),
-        source:      name,
-        icon,
-        label:       findingLabel(item, name),
-        detail:      item.line || item.detail || item.type || "",
-        ip:          item.ip   || null,
-        severity:    item.deleted || item.type === "Suspicious Process" || (name === "Memory" && item.suspicious) ? "HIGH" : "INFO",
-        raw:         item,
-      });
+// ─── Run the Python CLI and parse its JSON output ──────────────
+function runAgent(args, stdinPayload = null) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(PYTHON_BIN, ["-m", "correlation_agent", ...args], {
+      cwd: REPO_ROOT,
+      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      windowsHide: true,
     });
-  });
 
-  // Sort chronologically
-  allEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  return allEvents;
-}
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
 
-/**
- * Run every correlation rule and collect matching patterns.
- */
-function detectPatterns(logData, networkData, memoryData, diskData) {
-  const matched = [];
-  for (const rule of CORRELATION_RULES) {
-    try {
-      if (rule.test(logData, networkData, memoryData, diskData)) {
-        matched.push({
-          type:    rule.type,
-          message: rule.message,
-          weight:  rule.weight,
-          agents:  rule.agents,
-        });
+    child.on("error", (err) => {
+      reject(new CorrelationAgentError(
+        `Could not start Python (${PYTHON_BIN}): ${err.message}. Install Python 3.10+ or set PYTHON_BIN.`,
+        { code: "PYTHON_NOT_FOUND", status: 503 }
+      ));
+    });
+
+    child.on("close", (exitCode) => {
+      const out = Buffer.concat(stdout).toString("utf-8").trim();
+      const errText = Buffer.concat(stderr).toString("utf-8").trim();
+
+      let payload = null;
+      try {
+        payload = out ? JSON.parse(out) : null;
+      } catch {
+        payload = null;
       }
-    } catch (_) { /* rule errors must not crash the agent */ }
-  }
-  return matched;
+
+      if (exitCode === 0 && payload) return resolve(payload);
+
+      // The CLI printed a structured error ({ error_code, message, ... })
+      const message = payload?.message || errText.split("\n").pop() || `correlation agent exited with code ${exitCode}`;
+      const code = payload?.error_code || null;
+      // CA-E-1xx: the request carried bad input; anything else is ours
+      const status = code?.startsWith("CA-E-1") ? 400 : exitCode === EXIT_CONTRACT ? 500 : 500;
+      reject(new CorrelationAgentError(message, { code, status }));
+    });
+
+    if (stdinPayload !== null) {
+      child.stdin.on("error", () => {}); // the child may exit before reading everything
+      child.stdin.end(JSON.stringify(stdinPayload));
+    } else {
+      child.stdin.end();
+    }
+  });
 }
 
-/**
- * Compute a 0-100 risk score from:
- *   • volume of findings per agent
- *   • severity flags (deleted files, suspicious processes, etc.)
- *   • matched correlation patterns
- */
-function computeRiskScore(logData, networkData, memoryData, diskData, patterns) {
-  let score = 0;
-
-  // Volume contribution (max 30 pts)
-  const total = logData.length + networkData.length + memoryData.length + diskData.length;
-  score += Math.min(total * 2, 30);
-
-  // Severity flags (max 20 pts)
-  if (diskData.some(d => d.deleted))                     score += 10;
-  if (memoryData.some(isSuspiciousMemory)) score += 10;
-
-  // Pattern weights (capped at 70 pts total)
-  const patternScore = patterns.reduce((acc, p) => acc + p.weight, 0);
-  score += Math.min(patternScore, 70);
-
-  return Math.min(Math.round(score), 100);
-}
-
-/**
- * Map numeric score → RISK enum + label.
- */
-function scoreToRisk(score) {
-  if (score >= 65) return RISK.HIGH;
-  if (score >= 35) return RISK.MEDIUM;
-  return RISK.LOW;
-}
-
-/**
- * Flatten all raw findings into a single deduplicated evidence list
- * so the report agent has a clean, source-tagged array to work with.
- */
-function buildEvidenceList(logData, networkData, memoryData, diskData) {
-  const evidence = [];
-
-  const push = (source, item) => {
-    evidence.push({ source, ...item });
-  };
-
-  (logData     || []).forEach(i => push("Log",     i));
-  (networkData || []).forEach(i => push("Network", i));
-  (memoryData  || []).forEach(i => push("Memory",  i));
-  (diskData    || []).forEach(i => push("Disk",    i));
-
-  return evidence;
-}
-
-// ─── Main export ──────────────────────────────────────────────
-
-/**
- * runCorrelation({ logData, networkData, memoryData, diskData })
- *
- * Returns:
- * {
- *   riskLevel:   "LOW" | "MEDIUM" | "HIGH",
- *   riskScore:   number (0-100),
- *   confidence:  number (0-100),   // how much data was present
- *   patterns:    CorrelationPattern[],
- *   timeline:    TimelineEvent[],
- *   evidence:    Evidence[],
- *   summary:     string,
- *   agentStatus: { log, network, memory, disk }   // presence flags
- * }
- */
-function runCorrelation({ logData = [], networkData = [], memoryData = [], diskData = [] } = {}) {
-  // ── 1. Build unified timeline
-  const timeline = buildTimeline(logData, networkData, memoryData, diskData);
-
-  // ── 2. Detect cross-agent patterns
-  const patterns = detectPatterns(logData, networkData, memoryData, diskData);
-
-  // ── 3. Score and classify risk
-  const riskScore = computeRiskScore(logData, networkData, memoryData, diskData, patterns);
-  const riskLevel = scoreToRisk(riskScore);
-
-  // ── 4. Confidence: how many of the 4 agents contributed data
-  const agentsWithData = [logData, networkData, memoryData, diskData].filter(a => a.length > 0).length;
-  const confidence = Math.round((agentsWithData / 4) * 100);
-
-  // ── 5. Flatten evidence
-  const evidence = buildEvidenceList(logData, networkData, memoryData, diskData);
-
-  // ── 6. Agent status flags (useful for the report)
-  const agentStatus = {
-    log:     logData.length     > 0,
-    network: networkData.length > 0,
-    memory:  memoryData.length  > 0,
-    disk:    diskData.length    > 0,
-  };
-
-  // ── 7. One-line summary
-  const activeAgents = Object.entries(agentStatus)
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-    .join(", ");
-
-  const summary =
-    evidence.length === 0
-      ? "No findings were detected across any agent. System appears clean."
-      : `${evidence.length} finding(s) collected from ${agentsWithData} agent(s) ` +
-        `[${activeAgents}]. ${patterns.length} cross-agent pattern(s) matched. ` +
-        `Risk assessed as ${riskLevel} (score ${riskScore}/100, confidence ${confidence}%).`;
-
+// ─── Pre-2.0 fields some callers (Upload.jsx) still read ───────
+function withLegacyFields(envelope) {
   return {
-    riskLevel,
-    riskScore,
-    confidence,
-    patterns,
-    timeline,
-    evidence,
-    summary,
-    agentStatus,
+    ...envelope,
+    riskLevel: envelope.assessment.risk_level,
+    riskScore: envelope.assessment.risk_score,
+    confidence: Math.round(envelope.assessment.confidence * 100),
+    patterns: envelope.correlations.map((c) => ({
+      type: c.title, message: c.interpretation, severity: c.severity,
+      confidence: Math.round(c.confidence * 100), agents: c.domains,
+    })),
+    agentStatus: Object.fromEntries(Object.entries(envelope.inputs).map(([d, i]) => [d, i.supplied])),
   };
 }
 
+// ─── Public API ────────────────────────────────────────────────
+
+/**
+ * input   : { log, network, memory, disk } each { findings, meta?, provenance? }
+ *           (memory meta.envelopePath is followed to memory_agent_output.json)
+ *           or the legacy { logData, networkData, memoryData, diskData }
+ * options : { windowSeconds?, caseId? }
+ */
+const runCorrelation = async (input = {}, { windowSeconds, caseId } = {}) => {
+  const envelope = await runAgent([
+    "correlate", "--input", "-",
+    "-o", CASES_DIR,
+    "--case-id", caseId || `DF-CORR-${Date.now()}`,
+    ...(windowSeconds ? ["--window", String(windowSeconds)] : []),
+    "--json", "--compact", "-q",
+  ], input);
+  return withLegacyFields(envelope);
+};
+
+const runCorrelationDemo = async () => {
+  const envelope = await runAgent(["demo", "-o", CASES_DIR, "--json", "--compact", "-q"]);
+  return withLegacyFields(envelope);
+};
+
+const listRules = async () => runAgent(["rules", "--json"]);
+
+export { runCorrelationDemo, listRules, CorrelationAgentError };
 export default runCorrelation;

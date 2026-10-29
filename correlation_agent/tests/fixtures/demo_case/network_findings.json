@@ -1,0 +1,8 @@
+[
+  { "type": "External Connection", "ip": "185.77.22.90", "detail": "External communication from 192.168.56.10" },
+  { "type": "Beaconing Activity", "ip": "185.77.22.90", "detail": "412 packets sent to same destination" },
+  { "type": "External Connection", "ip": "45.155.205.18", "detail": "External communication from 192.168.56.10" },
+  { "type": "Potential Port Scan", "ip": "45.155.205.18", "detail": "Accessed 23 different ports" },
+  { "type": "External Connection", "ip": "142.250.72.196", "detail": "External communication from 192.168.56.10" },
+  { "type": "External Connection", "ip": "13.107.4.50", "detail": "External communication from 192.168.56.10" }
+]

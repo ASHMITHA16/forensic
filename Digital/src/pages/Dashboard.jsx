@@ -6,6 +6,7 @@ const agents = [
   { icon: "📊", title: "Log Agent",     desc: "Parse system and application logs for suspicious events and intrusions.",     path: "/agent/log"  },
   { icon: "🧠", title: "Memory Agent",  desc: "Inspect memory dumps for malicious processes and injected code.",            path: "/agent/memory" },
   { icon: "🌐", title: "Network Agent", desc: "Identify anomalous traffic, port scans, and C2 communication attempts.",     path: "/agent/network" },
+  { icon: "🔗", title: "Correlation Agent", desc: "Link findings across all four agents into an evidence-cited attack chain.", path: "/agent/correlation" },
 ];
 
 const stats = [

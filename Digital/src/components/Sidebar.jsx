@@ -8,6 +8,7 @@ const navItems = [
   { label: "Log Agent",     path: "/agent/log",     icon: "📊" },
   { label: "Memory Agent",  path: "/agent/memory",  icon: "🧠" },
   { label: "Network Agent", path: "/agent/network", icon: "🌐" },
+  { label: "Correlation Agent", path: "/agent/correlation", icon: "🔗" },
   { divider: true, label: "RECORDS" },
   { label: "History",     path: "/history",       icon: "🕒", badge: "9" },
 ];

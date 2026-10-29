@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import AgentPage from "./pages/AgentPage";
 import ResultPage from "./pages/ResultPage";
 import History   from "./pages/History";
+import CorrelationPage from "./pages/CorrelationPage";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
             <Route path="/agent/log"      element={<AgentPage type="log" />} />
             <Route path="/agent/memory"   element={<AgentPage type="memory" />} />
             <Route path="/agent/network"  element={<AgentPage type="network" />} />
+            <Route path="/agent/correlation" element={<CorrelationPage />} />
 
             {/* Result pages */}
             <Route path="/result/disk"    element={<ResultPage type="disk" />} />

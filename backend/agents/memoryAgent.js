@@ -114,6 +114,12 @@ function toFinding(f) {
     pid:           pids[0] ?? null,
     pids,
     ips:           f.entities?.ips || [],
+    // Entities beyond pid/process/ip, kept so the correlation agent can link domains
+    files:         f.entities?.files || [],
+    urls:          f.entities?.urls || [],
+    ports:         f.entities?.ports || [],
+    services:      f.entities?.services || [],
+    modules:       f.entities?.modules || [],
     explanation:   f.interpretation,
     observation:   f.observation_statement,
     alternatives:  f.alternative_explanations || [],
@@ -154,6 +160,8 @@ function buildMeta(envelope, mode, exitCode) {
     caseId:           envelope.case?.case_id,
     runId:            envelope.agent?.run_id,
     os:               [os.family, os.version, os.arch].filter(Boolean).join(" ") || "Unknown",
+    dumpSystemTime:   envelope.environment?.dump_system_time_utc || null,
+    clockSkewSeconds: envelope.environment?.clock_skew_seconds ?? null,
     evidence: {
       fileName: envelope.evidence?.file_name || null,
       sha256:   envelope.evidence?.hashes?.sha256_before || null,

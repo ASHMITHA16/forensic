@@ -4,7 +4,8 @@ import analyzeDisk from "../agents/diskAgent.js";
 import analyzeLogs from "../agents/logAgent.js";
 import analyzeNetwork from "../agents/networkAgent.js";
 import analyzeMemory, { replayMemoryDemo, startMemoryJob, getMemoryJob } from "../agents/memoryAgent.js";
-import correlate from "../agents/correlationAgent.js";
+import correlate, { runCorrelationDemo, listRules } from "../agents/correlationAgent.js";
+import generateCorrelationReport, { generateCorrelationPdf } from "../agents/correlationReport.js";
 import { generateHash } from "../services/hashService.js";
 import Evidence from "../models/Evidence.js";
 import History from "../models/History.js";
@@ -391,12 +392,165 @@ console.log(`Network analysis risk level: ${risk}`);
 });
 
 
+// ─── Correlation agent ────────────────────────────────────────
+
+const CORRELATION_DOMAINS = ["log", "network", "memory", "disk"];
+
+// A saved agent run → the { findings, meta, provenance } shape correlate() takes
+const loadAnalysis = async (domain, analysisId) => {
+  const saved = await History.findOne({ _id: analysisId, agent: domain });
+  if (!saved) {
+    const err = new Error(`No ${domain} analysis with id ${analysisId}`);
+    err.status = 404;
+    throw err;
+  }
+  return {
+    findings: saved.results || [],
+    meta: saved.analysisMeta || {},
+    provenance: {
+      analysisId: String(saved._id),
+      fileName: saved.fileName,
+      evidenceHash: saved.evidenceHash || null,
+      risk: saved.risk,
+      analysedAt: saved.createdAt,
+    },
+  };
+};
+
+// Persist a correlation run; a storage failure must not discard the analysis.
+// The envelope is already compact (cited evidence only); the full one is in
+// the agent's case workspace (envelope.workspace.envelope_path).
+const saveCorrelation = async (envelope, fileName) => {
+  try {
+    const saved = await History.create({
+      agent: "correlation",
+      fileName,
+      findings: envelope.correlations.length,
+      risk: envelope.assessment.risk_level.toLowerCase(),
+      results: envelope.correlations,
+      analysisMeta: envelope,
+    });
+    return { analysisId: saved._id, storageError: null };
+  } catch (err) {
+    return { analysisId: null, storageError: err.message };
+  }
+};
+
+const sourceLabel = (input) => CORRELATION_DOMAINS
+  .filter((d) => input[d]?.provenance?.fileName)
+  .map((d) => `${d}:${input[d].provenance.fileName}`)
+  .join(" + ") || "correlation (inline findings)";
+
+// Rule pack, for review — every threshold is visible
+router.get("/analyze/correlate/rules", async (req, res) => {
+  try {
+    res.json(await listRules());
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || null });
+  }
+});
+
+// Saved agent runs that can be fed to the correlation agent (no result bodies)
+router.get("/analyze/correlate/sources", async (req, res) => {
+  try {
+    const rows = await History.find({ agent: { $in: CORRELATION_DOMAINS } })
+      .select("agent fileName findings risk createdAt evidenceHash analysisMeta.mode analysisMeta.status")
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+    const sources = Object.fromEntries(CORRELATION_DOMAINS.map((d) => [d, rows.filter((r) => r.agent === d).map((r) => ({
+      analysisId: r._id, fileName: r.fileName, findings: r.findings, risk: r.risk, createdAt: r.createdAt,
+      hashChecked: Boolean(r.evidenceHash), mode: r.analysisMeta?.mode || null, status: r.analysisMeta?.status || null,
+    }))]));
+    res.json({ sources });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Body: { analysisIds: { log?, network?, memory?, disk? }, windowSeconds? }
+ *   or the legacy { logData, networkData, memoryData, diskData } arrays.
+ */
 router.post("/analyze/correlate", async (req, res) => {
-  const { logData, networkData, memoryData, diskData } = req.body;
+  try {
+    const { analysisIds, windowSeconds, ...legacy } = req.body || {};
+    let input = legacy;
 
-  const result = correlate({ logData, networkData, memoryData, diskData });
+    if (analysisIds && typeof analysisIds === "object") {
+      input = {};
+      for (const d of CORRELATION_DOMAINS) {
+        if (analysisIds[d]) input[d] = await loadAnalysis(d, analysisIds[d]);
+      }
+    }
 
-  res.json({ data: result });
+    const envelope = await correlate(input, { windowSeconds });
+    const { analysisId, storageError } = await saveCorrelation(envelope, sourceLabel(input));
+    res.json({ message: "Correlation completed", analysisId, storageError, data: envelope });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || null });
+  }
+});
+
+// Demo: the Python agent correlates its bundled case (memory_agent replay +
+// captured log/network/disk agent output). Not evidence.
+router.post("/analyze/correlate/demo", async (req, res) => {
+  try {
+    const envelope = await runCorrelationDemo();
+    const { analysisId, storageError } = await saveCorrelation(envelope, "demo case (bundled fixtures)");
+    res.json({ message: "Correlation demo completed", analysisId, storageError, data: envelope });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || null });
+  }
+});
+
+const sendCorrelationReport = async (envelope, format, res) => {
+  const report = generateCorrelationReport(envelope);
+  if (format === "markdown") return res.type("text/markdown").send(report.markdown);
+  if (format === "pdf") return res.type("application/pdf").send(await generateCorrelationPdf(report));
+  return res.json(report.json);
+};
+
+router.post("/analyze/correlate/report", async (req, res) => {
+  try {
+    await sendCorrelationReport(req.body, req.query.format || "json", res);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/analyze/correlate/report/:analysisId", async (req, res) => {
+  try {
+    const saved = await History.findOne({ _id: req.params.analysisId, agent: "correlation" });
+    if (!saved) return res.status(404).json({ error: "Correlation analysis not found" });
+    await sendCorrelationReport(saved.analysisMeta, req.query.format || "json", res);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Full envelope (correlation_agent_output.json) for a saved run
+router.get("/analyze/correlate/envelope/:analysisId", async (req, res) => {
+  try {
+    const saved = await History.findOne({ _id: req.params.analysisId, agent: "correlation" });
+    const envelopePath = saved?.analysisMeta?.workspace?.envelope_path;
+    if (!envelopePath || !fs.existsSync(envelopePath)) {
+      return res.status(404).json({ error: "Correlation envelope not found" });
+    }
+    return res.type("application/json").sendFile(envelopePath);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/analyze/correlate/:analysisId", async (req, res) => {
+  try {
+    const saved = await History.findOne({ _id: req.params.analysisId, agent: "correlation" });
+    if (!saved) return res.status(404).json({ error: "Correlation analysis not found" });
+    res.json({ analysisId: saved._id, data: saved.analysisMeta });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 

