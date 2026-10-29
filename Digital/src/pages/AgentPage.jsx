@@ -46,6 +46,7 @@ const AgentPage = ({ type }) => {
   const [uploadedPath, setUploadedPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState("idle");
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [memoryJob, setMemoryJob] = useState(null);
 
   const acceptedTypes = {
@@ -105,6 +106,37 @@ const AgentPage = ({ type }) => {
     }
 
     setFile(selectedFile);
+    // A new file invalidates the previous upload; otherwise Run would analyze the old one
+    setUploadedPath("");
+  };
+
+  // Uploads the selected file and returns its server path (null on failure)
+  const uploadFile = async () => {
+    setPhase("uploading");
+    setUploadPercent(0);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/upload",
+        formData,
+        {
+          // Memory/disk images are GBs; show how far along the transfer is
+          onUploadProgress: (e) => e.total && setUploadPercent(Math.round((e.loaded / e.total) * 100)),
+        }
+      );
+
+      setUploadedPath(res.data.data.path);
+      setPhase("idle");
+      return res.data.data.path;
+    } catch (err) {
+      console.error(err);
+      setPhase("idle");
+      alert(err.response?.data?.error ? `Upload failed ❌\n\n${err.response.data.error}` : "Upload failed ❌");
+      return null;
+    }
   };
 
   const handleUpload = async () => {
@@ -114,34 +146,25 @@ const AgentPage = ({ type }) => {
     }
 
     setLoading(true);
-    setPhase("uploading");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/api/upload",
-        formData
-      );
-
-      setUploadedPath(res.data.data.path);
-      setPhase("idle");
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed ❌");
-    } finally {
-      setLoading(false);
-    }
+    await uploadFile();
+    setLoading(false);
   };
 
   const handleAnalyze = async () => {
-  if (!uploadedPath) {
-    alert("Upload a file first!");
+  if (!file && !uploadedPath) {
+    alert("Select a file first!");
     return;
   }
 
   setLoading(true);
+
+  // Run uploads the selected file itself if Upload File was not clicked
+  const filePath = uploadedPath || await uploadFile();
+  if (!filePath) {
+    setLoading(false);
+    return;
+  }
+
   setPhase("analyzing");
 
   // Clear old data
@@ -169,11 +192,11 @@ const AgentPage = ({ type }) => {
   try {
     // Memory runs as a background job: a real dump outlasts a single HTTP request
     const res = type === "memory"
-      ? { data: await runMemoryJob(uploadedPath, setMemoryJob) }
+      ? { data: await runMemoryJob(filePath, setMemoryJob) }
       : await axios.post(
           `http://localhost:5000${config.endpoint}`,
           {
-            filePath: uploadedPath,
+            filePath,
           }
         );
 
@@ -304,10 +327,12 @@ const AgentPage = ({ type }) => {
             <button
               className="btn btn-primary"
               onClick={handleAnalyze}
-              disabled={loading || !uploadedPath}
+              disabled={loading || (!file && !uploadedPath)}
             >
               {phase === "analyzing"
                 ? "Analyzing…"
+                : phase === "uploading"
+                ? `Uploading… ${uploadPercent}%`
                 : `Run ${config.title}`}
             </button>
 
@@ -329,8 +354,8 @@ const AgentPage = ({ type }) => {
 
               <div className="loading-text">
                 {phase === "uploading"
-                  ? "Uploading file to server…"
-                  : type === "memory" && uploadedPath
+                  ? `Uploading file to server… ${uploadPercent}%`
+                  : type === "memory" && phase === "analyzing"
                   ? describeMemoryProgress(memoryJob)
                   : `Running ${config.title}...`}
               </div>
