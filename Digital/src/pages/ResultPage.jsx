@@ -1,10 +1,12 @@
 import React from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import Icon from "../components/Icon";
+import PageHeader from "../components/PageHeader";
 
 const RESULT_CONFIG = {
   disk: {
-    icon: "💾", title: "Disk Analysis Results",
+    icon: "disk", title: "Disk Analysis Results",
     renderCard: (item, i) => (
       <div key={i} className={`forensic-card ${item.deleted ? "disk-deleted" : item.suspicious ? "mem-suspicious" : "disk-ok"}`}
            style={{ animationDelay: `${i * 0.05}s` }}>
@@ -26,7 +28,7 @@ const RESULT_CONFIG = {
     ),
   },
   log: {
-    icon: "📊", title: "Log Analysis Results",
+    icon: "log", title: "Log Analysis Results",
     renderCard: (item, i) => (
       <div key={i} className={`forensic-card log-finding log-${item.severity || "info"}`} style={{ animationDelay: `${i * 0.05}s` }}>
         <div className="log-finding-header">
@@ -45,7 +47,7 @@ const RESULT_CONFIG = {
     ),
   },
   memory: {
-    icon: "🧠", title: "Memory Analysis Results",
+    icon: "memory", title: "Memory Analysis Results",
     renderCard: (item, i) => item.ruleId ? (
       <div key={i} className={`forensic-card log-finding log-${item.severity || "info"}`}
            style={{ animationDelay: `${i * 0.05}s` }}>
@@ -84,7 +86,7 @@ const RESULT_CONFIG = {
     ),
   },
   network: {
-    icon: "🌐", title: "Network Analysis Results",
+    icon: "network", title: "Network Analysis Results",
     renderCard: (item, i) => (
       <div key={i} className="forensic-card network" style={{ animationDelay: `${i * 0.05}s` }}>
         <h4>{item.type}</h4>
@@ -295,23 +297,17 @@ const logConfidence =
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <div className="page-title">{config.icon} // {type}_results</div>
-          <div className="page-subtitle">{config.title}</div>
-        </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <span className={`risk-badge ${risk}`}>● {riskLabel}</span>
-          <button className="btn btn-ghost" onClick={() => navigate(`/agent/${type}`)}>
-            ← New Scan
-          </button>
-        </div>
-      </div>
+      <PageHeader icon={config.icon} eyebrow="Results" title={config.title} subtitle={fileName}>
+        <span className={`risk-badge ${risk}`}>{riskLabel}</span>
+        <button className="btn btn-ghost" onClick={() => navigate(`/agent/${type}`)}>
+          <Icon name="arrowLeft" size={16} /> New scan
+        </button>
+      </PageHeader>
 
       <div className="page-body">
 
         {/* SUMMARY */}
-        <div className="section-title">📋 Summary</div>
+        <h2 className="section-title">Summary</h2>
         <div className="summary-box">
           <div className="summary-meta">
             <div className="meta-item">
@@ -320,7 +316,7 @@ const logConfidence =
             </div>
             <div className="meta-item">
               <div className="meta-key">File Analyzed</div>
-              <div className="meta-val" style={{ fontFamily: "var(--mono)", fontSize: "0.8rem" }}>{fileName}</div>
+              <div className="meta-val mono">{fileName}</div>
             </div>
             <div className="meta-item">
               <div className="meta-key">Total Findings</div>
@@ -403,12 +399,12 @@ const logConfidence =
             <div className="meta-item">
               <div className="meta-key">Risk Level</div>
               <div className="meta-val">
-                <span className={`risk-badge ${risk}`}>● {riskLabel}</span>
+                <span className={`risk-badge ${risk}`}>{riskLabel}</span>
               </div>
             </div>
             <div className="meta-item">
               <div className="meta-key">Timestamp</div>
-              <div className="meta-val" style={{ fontFamily: "var(--mono)", fontSize: "0.8rem" }}>
+              <div className="meta-val mono">
                 {new Date().toLocaleString()}
               </div>
             </div>
@@ -416,17 +412,17 @@ const logConfidence =
         </div>
 
         {/* FINDINGS */}
-        <div className="section-title">🔍 Findings</div>
+        <h2 className="section-title">Findings <span className="section-count">{data.length}</span></h2>
         <div className="result-section">
           {data.length === 0
-            ? <p className="result-empty">— no findings detected —</p>
+            ? <p className="result-empty">No findings detected in this evidence.</p>
             : data.map((item, i) => config.renderCard(item, i))
           }
         </div>
 
         {type === "log" && logMeta && (
           <>
-            <div className="section-title">📈 Detection Metrics</div>
+            <h2 className="section-title">Detection metrics</h2>
             <div className="summary-box log-metrics-box">
               <div className="log-metric-row">
                 <span>Format <b>{logMeta.format}</b></span>
@@ -440,7 +436,7 @@ const logConfidence =
         )}
       {type === "network" && networkMeta && (
   <>
-    <div className="section-title">🌐 Network Metrics</div>
+    <h2 className="section-title">Network metrics</h2>
 <div className="summary-box log-metrics-box">
   <div className="log-metric-row">
     <span>
@@ -480,7 +476,7 @@ const logConfidence =
                 <p>{memoryMeta.statusBasis}</p>
               </div>
             )}
-            <div className="section-title">📈 Memory Analysis Metrics</div>
+            <h2 className="section-title">Memory analysis metrics</h2>
             <div className="summary-box log-metrics-box">
               <div className="log-metric-row">
                 <span>Case <b>{memoryMeta.caseId}</b></span>
@@ -504,7 +500,7 @@ const logConfidence =
 
             {memoryMeta.iocs?.length > 0 && (
               <>
-                <div className="section-title">🎯 Indicators of Compromise ({memoryMeta.iocs.length})</div>
+                <h2 className="section-title">Indicators of compromise <span className="section-count">{memoryMeta.iocs.length}</span></h2>
                 <div className="summary-box">
                   <div className="mem-ioc-list">
                     {memoryMeta.iocs.map((ioc, i) => (
@@ -521,7 +517,7 @@ const logConfidence =
 
             {memoryMeta.limitations?.length > 0 && (
               <>
-                <div className="section-title">⚠ Limitations</div>
+                <h2 className="section-title">Limitations</h2>
                 <div className="summary-box">
                   <ul className="mem-limitations">
                     {memoryMeta.limitations.map((l, i) => <li key={i}>{l}</li>)}
@@ -534,7 +530,7 @@ const logConfidence =
 
         {type === "disk" && diskMeta && (
           <>
-            <div className="section-title">📈 Disk Analysis Metrics</div>
+            <h2 className="section-title">Disk analysis metrics</h2>
             <div className="summary-box log-metrics-box">
               <div className="log-metric-row">
                 <span>Filesystem <b>{diskMeta.volumeInfo?.fileSystemType || "Unknown"}</b></span>
@@ -555,8 +551,8 @@ const logConfidence =
 
 
         {/* TIMELINE */}
-        <div className="section-title">⏱ Analysis Timeline</div>
-        <div className="timeline" style={{ marginBottom: "32px" }}>
+        <h2 className="section-title">Analysis timeline</h2>
+        <div className="timeline">
           {(type === "log" && logMeta?.timeline?.length ? logMeta.timeline
             : type === "memory" && memoryMeta?.timeline?.length ? memoryMeta.timeline
             : DUMMY_TIMELINE).map((t, i) => (
@@ -570,64 +566,64 @@ const logConfidence =
         </div>
 
         <div className="btn-group">
-          <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← Dashboard</button>
-          <button className="btn btn-ghost" onClick={() => navigate("/history")}>View History</button>
+          <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}><Icon name="arrowLeft" size={16} /> Dashboard</button>
+          <button className="btn btn-ghost" onClick={() => navigate("/history")}>View history</button>
           {type === "log" && (
   <>
     <button
-      className="btn btn-success"
+      className="btn btn-ghost"
       onClick={() => downloadLogReport("json")}
     >
-      JSON Report
+      <Icon name="download" size={16} /> JSON report
     </button>
 
     <button
       className="btn btn-ghost"
       onClick={() => downloadLogReport("markdown")}
     >
-      Markdown Report
+      <Icon name="download" size={16} /> Markdown report
     </button>
 
     <button
-      className="btn btn-danger"
+      className="btn btn-ghost"
       onClick={() => downloadLogReport("pdf")}
     >
-      PDF Report
+      <Icon name="download" size={16} /> PDF report
     </button>
   </>
 )}
 
 {type === "memory" && memoryMeta?.envelopePath && memoryAnalysisId && (
-  <button className="btn btn-success" onClick={downloadMemoryEnvelope}>
-    Output Envelope (JSON)
+  <button className="btn btn-ghost" onClick={downloadMemoryEnvelope}>
+    <Icon name="download" size={16} /> Output envelope (JSON)
   </button>
 )}
 
 {type === "network" && (
   <>
     <button
-      className="btn btn-success"
+      className="btn btn-ghost"
       onClick={() => downloadNetworkReport("json")}
     >
-      JSON Report
+      <Icon name="download" size={16} /> JSON report
     </button>
 
     <button
       className="btn btn-ghost"
       onClick={() => downloadNetworkReport("markdown")}
     >
-      Markdown Report
+      <Icon name="download" size={16} /> Markdown report
     </button>
 
     <button
-      className="btn btn-danger"
+      className="btn btn-ghost"
       onClick={() => downloadNetworkReport("pdf")}
     >
-      PDF Report
+      <Icon name="download" size={16} /> PDF report
     </button>
   </>
 )}
-          <button className="btn btn-primary" onClick={() => navigate(`/agent/${type}`)}>Run New Scan</button>
+          <button className="btn btn-primary" onClick={() => navigate(`/agent/${type}`)}>Run new scan</button>
         </div>
       </div>
     

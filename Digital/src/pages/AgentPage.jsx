@@ -2,17 +2,19 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { runMemoryJob, describeMemoryProgress } from "./memoryJob";
+import Icon from "../components/Icon";
+import PageHeader from "../components/PageHeader";
 
 const AGENT_CONFIG = {
   disk: {
-    icon: "💾",
+    icon: "disk",
     title: "Disk Agent",
     endpoint: "/api/analyze/disk",
     result: "/result/disk",
     color: "#22d3a7",
   },
   log: {
-    icon: "📊",
+    icon: "log",
     title: "Log Agent",
     endpoint: "/api/analyze/log",
     result: "/result/log",
@@ -21,7 +23,7 @@ const AGENT_CONFIG = {
     coverage: ["Authentication failures", "Unauthorized access", "Privilege escalation", "Suspicious commands", "Malware indicators", "IPv4 indicators"],
   },
   memory: {
-    icon: "🧠",
+    icon: "memory",
     title: "Memory Agent",
     endpoint: "/api/analyze/memory",
     result: "/result/memory",
@@ -30,7 +32,7 @@ const AGENT_CONFIG = {
     coverage: ["Hidden / orphaned processes", "Code injection (malfind)", "Unlinked modules", "Encoded PowerShell", "Suspicious network sockets", "Rogue services"],
   },
   network: {
-    icon: "🌐",
+    icon: "network",
     title: "Network Agent",
     endpoint: "/api/analyze/network",
     result: "/result/network",
@@ -271,59 +273,57 @@ const AgentPage = ({ type }) => {
 };
 
 
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+    if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  };
+
   return (
     <>
-      <div className="page-header">
-        <div>
-          <div className="page-title">
-            {config.icon} {config.title}
-          </div>
-
-          <div className="page-subtitle">
-            Upload and analyze forensic evidence
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={config.icon}
+        eyebrow="Agent"
+        title={config.title}
+        subtitle="Upload a piece of evidence and run the agent to produce structured findings."
+      />
 
       <div className="page-body">
         <div className="upload-panel">
-          <div className="panel-label">
-            Step 1 — Select evidence file
-          </div>
+          <div className="panel-label">Select evidence file</div>
+          <p className="panel-hint">
+            Accepted formats: {acceptedTypes[type].split(",").join(", ")}. Running the agent uploads the file automatically.
+          </p>
 
-          <label className="file-drop-zone">
+          <label className={`file-drop-zone ${file ? "has-file" : ""}`}>
             <input
               type="file"
               accept={acceptedTypes[type]}
               onChange={handleFileChange}
             />
 
-            <span style={{ fontSize: "1.5rem" }}>📁</span>
+            <div className="file-drop-icon">
+              <Icon name={file ? "check" : "upload"} size={20} />
+            </div>
 
             <div>
               {file ? (
-                <div className="file-selected-name">
-                  ✔ {file.name}
-                </div>
+                <>
+                  <div className="file-selected-name">{file.name}</div>
+                  <div className="file-drop-meta">{formatSize(file.size)} · Click to choose a different file</div>
+                </>
               ) : (
-                <div className="file-drop-label">
-                  Drop file here or <span>click to browse</span>
-                </div>
+                <>
+                  <div className="file-drop-label">
+                    Choose a file or <span>browse your computer</span>
+                  </div>
+                  <div className="file-drop-meta">Large disk and memory images can take a few minutes to upload</div>
+                </>
               )}
             </div>
           </label>
 
           <div className="btn-group">
-            <button
-              className="btn btn-ghost"
-              onClick={handleUpload}
-              disabled={loading || !file}
-            >
-              {phase === "uploading"
-                ? "Uploading…"
-                : "Upload File"}
-            </button>
-
             <button
               className="btn btn-primary"
               onClick={handleAnalyze}
@@ -336,6 +336,15 @@ const AgentPage = ({ type }) => {
                 : `Run ${config.title}`}
             </button>
 
+            <button
+              className="btn btn-ghost"
+              onClick={handleUpload}
+              disabled={loading || !file}
+            >
+              <Icon name="upload" size={16} />
+              {phase === "uploading" ? "Uploading…" : "Upload only"}
+            </button>
+
             {type === "memory" && (
               <button
                 className="btn btn-ghost"
@@ -343,13 +352,13 @@ const AgentPage = ({ type }) => {
                 disabled={loading}
                 title="Runs the detection pipeline on bundled Volatility output — no memory image is read"
               >
-                Run Demo Case
+                Run demo case
               </button>
             )}
           </div>
 
           {loading && (
-            <div style={{ marginTop: "16px" }}>
+            <div className="loading-block">
               <div className="loading-bar" />
 
               <div className="loading-text">
@@ -357,30 +366,22 @@ const AgentPage = ({ type }) => {
                   ? `Uploading file to server… ${uploadPercent}%`
                   : type === "memory" && phase === "analyzing"
                   ? describeMemoryProgress(memoryJob)
-                  : `Running ${config.title}...`}
+                  : `Running ${config.title}…`}
               </div>
             </div>
           )}
 
           {uploadedPath && (
-            <div style={{ marginTop: "14px" }}>
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "0.68rem",
-                  color: "var(--success)",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                ✔ FILE READY — {uploadedPath}
-              </span>
+            <div className="upload-status">
+              <Icon name="check" size={16} />
+              File ready on server <code>{uploadedPath}</code>
             </div>
           )}
         </div>
 
         {(type === "log" || type === "memory") && (
           <div className="log-agent-guide">
-            <div className="section-title">📡 Detection coverage</div>
+            <h2 className="section-title">Detection coverage</h2>
             <p>{config.description}</p>
             <div className="log-coverage-list">
               {config.coverage.map((item) => <span key={item}>{item}</span>)}
@@ -388,39 +389,23 @@ const AgentPage = ({ type }) => {
           </div>
         )}
 
-        <div className="section-title">
-          ℹ About This Agent
-        </div>
+        <h2 className="section-title">About this agent</h2>
 
         <div className="summary-box">
           <div className="summary-meta">
             <div className="meta-item">
-              <div className="meta-key">Agent Type</div>
-              <div className="meta-val">
-                {config.title}
-              </div>
+              <div className="meta-key">Agent type</div>
+              <div className="meta-val">{config.title}</div>
             </div>
 
             <div className="meta-item">
               <div className="meta-key">Endpoint</div>
-
-              <div
-                className="meta-val"
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "0.8rem",
-                }}
-              >
-                POST {config.endpoint}
-              </div>
+              <div className="meta-val mono">POST {config.endpoint}</div>
             </div>
 
             <div className="meta-item">
               <div className="meta-key">Output</div>
-
-              <div className="meta-val">
-                Structured findings + risk assessment
-              </div>
+              <div className="meta-val">Structured findings + risk assessment</div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "./pages/forensic.css"; // Global styles for forensic pages
 
 import Sidebar   from "./components/Sidebar";
@@ -9,9 +9,19 @@ import ResultPage from "./pages/ResultPage";
 import History   from "./pages/History";
 import CorrelationPage from "./pages/CorrelationPage";
 
+// The router keeps the window scroll between pages; start each page at the top
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <div className="app-shell">
         <Sidebar />
         <main className="main-content">

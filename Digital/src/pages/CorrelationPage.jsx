@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
+import Icon from "../components/Icon";
+import PageHeader from "../components/PageHeader";
 
 const API = "http://localhost:5000/api";
 
@@ -114,20 +116,20 @@ const CorrelationPage = () => {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <div className="page-title">🔗 Correlation Agent</div>
-          <div className="page-subtitle">Link findings across log, network, memory and disk evidence</div>
-        </div>
-      </div>
+      <PageHeader
+        icon="correlation"
+        eyebrow="Agent"
+        title="Correlation Agent"
+        subtitle="Link findings across log, network, memory and disk evidence."
+      />
 
       <div className="page-body corr-page">
         <div className="upload-panel">
-          <div className="panel-label">Step 1 — Choose the agent runs to correlate</div>
+          <div className="panel-label">Choose the agent runs to correlate</div>
           <div className="corr-select-grid">
             {DOMAINS.map((d) => (
               <label key={d.key} className="corr-select">
-                <span>{d.icon} {d.label}</span>
+                <span><Icon name={d.key} size={16} /> {d.label}</span>
                 <select
                   value={selected[d.key]}
                   onChange={(e) => setSelected({ ...selected, [d.key]: e.target.value })}
@@ -146,7 +148,7 @@ const CorrelationPage = () => {
           </p>
 
           <div className="btn-group">
-            <button className="btn btn-ghost" onClick={selectLatest} disabled={loading}>Select Latest Of Each</button>
+            <button className="btn btn-ghost" onClick={selectLatest} disabled={loading}>Select latest of each</button>
             <button className="btn btn-primary" onClick={() => run(false)} disabled={loading || chosen.length === 0}>
               {loading ? "Correlating…" : `Run Correlation (${chosen.length} source${chosen.length === 1 ? "" : "s"})`}
             </button>
@@ -156,11 +158,11 @@ const CorrelationPage = () => {
               disabled={loading}
               title="Correlates bundled log/network/disk fixtures with the memory demo replay — not evidence"
             >
-              Run Demo Case
+              Run demo case
             </button>
           </div>
           {loading && (
-            <div style={{ marginTop: "16px" }}>
+            <div className="loading-block">
               <div className="loading-bar" />
               <div className="loading-text">Normalising findings, linking entities, applying rule pack…</div>
             </div>
@@ -169,7 +171,7 @@ const CorrelationPage = () => {
 
         {!env && (
           <div className="log-agent-guide">
-            <div className="section-title">📡 What it does</div>
+            <h2 className="section-title">What it does</h2>
             <p>
               Normalises every agent's findings into evidence items, links them across domains by shared entities,
               applies the COR-v1 rule pack, places only real timestamps on a unified timeline, maps the result to
@@ -200,12 +202,12 @@ const CorrelationPage = () => {
               <div className="mem-status-banner"><strong>NOT SAVED TO HISTORY</strong><p>{result.storageError}</p></div>
             )}
 
-            <div className="section-title">🎯 Assessment</div>
+            <h2 className="section-title">Assessment</h2>
             <div className="summary-box">
               <div className="summary-meta">
                 <div className="meta-item">
                   <div className="meta-key">Risk</div>
-                  <div className="meta-val"><span className={`risk-badge ${String(a.risk_level).toLowerCase()}`}>● {a.risk_level}</span> {a.risk_score}/100</div>
+                  <div className="meta-val"><span className={`risk-badge ${String(a.risk_level).toLowerCase()}`}>{a.risk_level}</span> {a.risk_score}/100</div>
                 </div>
                 <div className="meta-item">
                   <div className="meta-key">Assessment confidence</div>
@@ -237,18 +239,18 @@ const CorrelationPage = () => {
               </div>
               <p className="corr-digest">core digest {env.core_digest}</p>
               <div className="btn-group" style={{ marginTop: 12 }}>
-                <button className="btn btn-ghost" onClick={() => download("json")}>⬇ JSON</button>
-                <button className="btn btn-ghost" onClick={() => download("markdown")}>⬇ Markdown</button>
-                <button className="btn btn-success" onClick={() => download("pdf")}>⬇ PDF Report</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => download("json")}><Icon name="download" size={14} /> JSON</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => download("markdown")}><Icon name="download" size={14} /> Markdown</button>
+                <button className="btn btn-primary btn-sm" onClick={() => download("pdf")}><Icon name="download" size={14} /> PDF report</button>
                 {result.analysisId && env.workspace && (
-                  <a className="btn btn-ghost" href={`${API}/analyze/correlate/envelope/${result.analysisId}`} target="_blank" rel="noreferrer">
-                    ⬇ Full Envelope
+                  <a className="btn btn-ghost btn-sm" href={`${API}/analyze/correlate/envelope/${result.analysisId}`} target="_blank" rel="noreferrer">
+                    <Icon name="download" size={14} /> Full envelope
                   </a>
                 )}
               </div>
             </div>
 
-            <div className="section-title">🧭 Hypotheses</div>
+            <h2 className="section-title">Hypotheses</h2>
             <div className="corr-hyp-grid">
               {env.hypotheses.map((h) => (
                 <div key={h.hypothesis_id} className={`forensic-card ${h.hypothesis_id === "H1" ? "correlation" : ""}`}>
@@ -268,7 +270,7 @@ const CorrelationPage = () => {
               ))}
             </div>
 
-            <div className="section-title">⛓ Attack Chain</div>
+            <h2 className="section-title">Attack chain</h2>
             <div className="summary-box">
               <div className="corr-chain">
                 {env.attack_chain.phases.map((p, i) => (
@@ -280,13 +282,13 @@ const CorrelationPage = () => {
                     </div>
                   </React.Fragment>
                 ))}
-                {env.attack_chain.phases.length === 0 && <span className="result-empty">— no tactic-mapped findings —</span>}
+                {env.attack_chain.phases.length === 0 && <span className="corr-hint">No tactic-mapped findings.</span>}
               </div>
               <p className="log-raw" style={{ marginTop: 12 }}>{env.attack_chain.narrative}</p>
             </div>
 
-            <div className="section-title">🔥 Correlations</div>
-            {env.correlations.length === 0 && <p className="result-empty">— no cross-domain correlations — check the limitations below before reading this as "clean" —</p>}
+            <h2 className="section-title">Correlations <span className="section-count">{env.correlations.length}</span></h2>
+            {env.correlations.length === 0 && <p className="result-empty">No cross-domain correlations. Check the limitations below before reading this as “clean”.</p>}
             {env.correlations.map((c, i) => (
               <div key={c.correlation_id} className={`forensic-card log-finding log-${c.severity}`} style={{ animationDelay: `${i * 0.04}s` }}>
                 <div className="log-finding-header">
@@ -318,7 +320,7 @@ const CorrelationPage = () => {
                   <div className="log-coverage-list mem-mitre">{c.mitre_attack.map((t) => <span key={t}>{t}</span>)}</div>
                 )}
                 <button
-                  className="btn btn-ghost corr-evidence-toggle"
+                  className="btn btn-ghost btn-sm corr-evidence-toggle"
                   onClick={() => setOpenEvidence({ ...openEvidence, [c.correlation_id]: !openEvidence[c.correlation_id] })}
                 >
                   {openEvidence[c.correlation_id] ? "Hide" : "Show"} cited evidence ({c.evidence_refs.length})
@@ -340,28 +342,30 @@ const CorrelationPage = () => {
               </div>
             ))}
 
-            <div className="section-title">🕸 Cross-Domain Entities</div>
-            <div className="summary-box" style={{ padding: 0, overflow: "hidden" }}>
+            <h2 className="section-title">Cross-domain entities</h2>
+            <div className="summary-box flush">
+              <div className="table-wrap">
               <table className="history-table">
                 <thead><tr><th>Entity</th><th>Type</th><th>Strength</th><th>Domains</th><th>Findings</th></tr></thead>
                 <tbody>
                   {env.entity_links.map((l) => (
                     <tr key={l.key}>
-                      <td style={{ fontFamily: "var(--mono)", fontSize: "0.76rem", overflowWrap: "anywhere" }}>{l.value}</td>
+                      <td className="cell-mono" style={{ overflowWrap: "anywhere" }}>{l.value}</td>
                       <td>{l.type}{l.scope ? ` (${l.scope})` : ""}</td>
                       <td><span className={`corr-entity ${l.strength}`}>{l.strength}</span></td>
                       <td>{l.domains.map((d) => DOMAIN_ICON[d]).join(" ")}</td>
-                      <td style={{ fontFamily: "var(--mono)" }}>{l.evidence_refs.length}</td>
+                      <td className="cell-mono">{l.evidence_refs.length}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
               {env.entity_links.length === 0 && <div style={{ padding: 20, textAlign: "center" }}>No entity appears in more than one domain.</div>}
             </div>
 
-            <div className="section-title">🕒 Unified Timeline</div>
+            <h2 className="section-title">Unified timeline</h2>
             <div className="btn-group" style={{ marginBottom: 12 }}>
-              <button className="btn btn-ghost" onClick={() => setShowContext(!showContext)}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowContext(!showContext)}>
                 {showContext ? "Findings only" : "Include memory context events"}
               </button>
             </div>
@@ -369,7 +373,7 @@ const CorrelationPage = () => {
               Only real timestamps are placed. Untimed findings, not placed:{" "}
               {Object.entries(env.untimed_findings || {}).map(([d, n]) => `${DOMAIN_ICON[d]} ${n}`).join("  ")}
             </p>
-            <div className="timeline" style={{ marginBottom: "32px" }}>
+            <div className="timeline">
               {timeline.map((t, i) => (
                 <div key={t.event_id} className="timeline-item" style={{ animationDelay: `${Math.min(i, 30) * 0.03}s` }}>
                   {/* UTC, as recorded: local time would misalign sources for anyone reading in another zone */}
@@ -380,10 +384,10 @@ const CorrelationPage = () => {
                   </div>
                 </div>
               ))}
-              {timeline.length === 0 && <p className="result-empty">— no timestamped findings —</p>}
+              {timeline.length === 0 && <p className="corr-hint">No timestamped findings.</p>}
             </div>
 
-            <div className="section-title">⚠ Limitations</div>
+            <h2 className="section-title">Limitations</h2>
             <div className="summary-box">
               <ul className="mem-limitations">{env.limitations.map((l, i) => <li key={i}>{l}</li>)}</ul>
             </div>
